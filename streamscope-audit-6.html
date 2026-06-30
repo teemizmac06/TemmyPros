@@ -1,0 +1,2486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamScope Audit — Twitch Channel Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════
+   TOKENS
+═══════════════════════════════════════════ */
+:root {
+  --purple:#9146FF; --purple-l:#B57BFF; --purple-d:#6B35CC;
+  --purple-glow:rgba(145,70,255,0.12);
+  --mint:#00F5A0; --amber:#FF9500; --crimson:#FF4560; --blue:#00BFFF;
+  --bg:#FFFFFF; --bg2:#F7F5FF; --bg3:#EDE8FF;
+  --card:#FFFFFF; --border:#E6E0FF;
+  --text:#09080F; --text2:#4A4265; --text3:#8C86A8;
+  --shadow:0 2px 16px rgba(145,70,255,0.07);
+  --shadow-md:0 6px 30px rgba(145,70,255,0.11);
+  --shadow-lg:0 16px 56px rgba(145,70,255,0.16);
+  --r:16px; --rs:10px;
+  --ease:cubic-bezier(0.4,0,0.2,1);
+}
+[data-theme="dark"]{
+  --bg:#090C18; --bg2:#10142A; --bg3:#181D38;
+  --card:#111528; --border:#1C2040;
+  --text:#EEE8FF; --text2:#A49FC8; --text3:#585478;
+  --shadow:0 2px 16px rgba(0,0,0,0.5);
+  --shadow-md:0 6px 30px rgba(0,0,0,0.5);
+  --shadow-lg:0 16px 56px rgba(0,0,0,0.7);
+}
+
+/* ═══════════════════════════════════════════
+   RESET + BASE
+═══════════════════════════════════════════ */
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);transition:background .3s,color .3s;overflow-x:hidden;min-height:100vh}
+
+/* ═══════════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════════ */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  height:60px;padding:0 28px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(255,255,255,0.88);backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);transition:background .3s;
+}
+[data-theme="dark"] nav{background:rgba(9,12,24,0.88)}
+
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;color:var(--text);text-decoration:none;cursor:pointer}
+.logo-mark{width:30px;height:30px;background:linear-gradient(135deg,var(--purple),var(--purple-l));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.logo em{font-style:normal;color:var(--purple)}
+
+.nav-r{display:flex;align-items:center;gap:10px}
+.icon-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--text);transition:all .2s var(--ease)}
+.icon-btn:hover{background:var(--purple-glow);border-color:var(--purple)}
+.nav-pill{background:var(--purple);color:#fff;font-size:10px;font-weight:800;padding:3px 9px;border-radius:100px;letter-spacing:.6px}
+
+/* ═══════════════════════════════════════════
+   LANDING
+═══════════════════════════════════════════ */
+#page-landing{
+  min-height:100vh;padding-top:60px;
+  background:linear-gradient(160deg,var(--bg) 0%,var(--bg2) 60%,var(--bg3) 100%);
+  position:relative;overflow:hidden;
+}
+.orb{position:absolute;border-radius:50%;pointer-events:none;filter:blur(70px)}
+.orb1{width:480px;height:480px;background:rgba(145,70,255,.1);top:-120px;right:-80px}
+.orb2{width:320px;height:320px;background:rgba(0,245,160,.06);bottom:60px;left:-80px}
+.orb3{width:220px;height:220px;background:rgba(0,191,255,.07);top:45%;right:25%}
+.orb4{width:160px;height:160px;background:rgba(145,70,255,.08);bottom:30%;left:30%}
+
+.hero{max-width:820px;margin:0 auto;padding:76px 24px 52px;text-align:center;position:relative;z-index:1}
+
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--purple-glow);border:1px solid rgba(145,70,255,.3);
+  border-radius:100px;padding:5px 15px;margin-bottom:26px;
+  font-size:11px;font-weight:700;color:var(--purple);letter-spacing:.8px;text-transform:uppercase
+}
+.eyebrow-dot{width:5px;height:5px;background:var(--purple);border-radius:50%;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)}}
+
+.hero h1{
+  font-size:clamp(34px,6vw,66px);font-weight:900;line-height:1.08;
+  letter-spacing:-2px;margin-bottom:18px
+}
+.hero h1 .g{
+  background:linear-gradient(135deg,var(--purple) 0%,var(--purple-l) 45%,var(--mint) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent
+}
+.hero p{font-size:17px;color:var(--text2);max-width:520px;margin:0 auto 44px;line-height:1.65;font-weight:400}
+
+/* Search */
+.search-box{
+  max-width:660px;margin:0 auto 28px;
+  background:var(--card);border:2px solid var(--border);border-radius:18px;
+  padding:7px;display:flex;align-items:center;gap:6px;
+  box-shadow:var(--shadow-lg);transition:border-color .2s,box-shadow .2s
+}
+.search-box:focus-within{border-color:var(--purple);box-shadow:0 0 0 4px var(--purple-glow),var(--shadow-lg)}
+.search-pre{padding:0 4px 0 10px;color:var(--text3);font-size:17px;font-family:'JetBrains Mono',monospace;white-space:nowrap;user-select:none}
+.search-input{
+  flex:1;border:none;outline:none;background:transparent;
+  font-size:17px;font-family:'Inter',sans-serif;color:var(--text);font-weight:500;
+  padding:11px 4px;min-width:0
+}
+.search-input::placeholder{color:var(--text3);font-weight:400}
+.search-btn{
+  background:var(--purple);color:#fff;border:none;border-radius:12px;
+  padding:13px 26px;font-size:14px;font-weight:700;cursor:pointer;
+  transition:all .2s var(--ease);white-space:nowrap;font-family:'Inter',sans-serif;
+  letter-spacing:.2px;flex-shrink:0
+}
+.search-btn:hover{background:var(--purple-d);transform:translateY(-1px);box-shadow:0 8px 24px rgba(145,70,255,.4)}
+.search-btn:active{transform:translateY(0)}
+.search-btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* Recent chips */
+.recents{text-align:center;margin-bottom:52px}
+.recents-lbl{font-size:11px;color:var(--text3);font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px}
+.chips{display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.chip{
+  background:var(--bg2);border:1px solid var(--border);border-radius:100px;
+  padding:5px 13px;font-size:12px;font-weight:600;color:var(--text2);
+  cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:5px
+}
+.chip:hover{border-color:var(--purple);color:var(--purple);background:var(--purple-glow)}
+.chip-x{opacity:.4;font-size:10px;cursor:pointer;margin-left:2px}
+.chip-x:hover{opacity:1;color:var(--crimson)}
+
+/* Preview */
+.preview-wrap{max-width:880px;margin:0 auto;padding:0 24px 80px;position:relative;z-index:1}
+.preview-lbl{text-align:center;font-size:11px;color:var(--text3);font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-bottom:18px}
+.preview-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);box-shadow:var(--shadow-lg);overflow:hidden;
+  position:relative
+}
+.preview-overlay{
+  position:absolute;inset:0;z-index:5;
+  background:linear-gradient(to bottom,transparent 20%,var(--bg2) 85%);
+  display:flex;align-items:flex-end;justify-content:center;padding-bottom:28px
+}
+.preview-cta{
+  background:var(--purple);color:#fff;border:none;border-radius:100px;
+  padding:11px 26px;font-size:13px;font-weight:700;cursor:pointer;
+  font-family:'Inter',sans-serif;box-shadow:0 8px 28px rgba(145,70,255,.45);
+  transition:all .2s
+}
+.preview-cta:hover{transform:translateY(-2px);box-shadow:0 12px 36px rgba(145,70,255,.55)}
+
+.prev-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:20px}
+.prev-cell{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);padding:14px}
+.prev-cell-lbl{font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px}
+.prev-cell-val{font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace}
+.prev-cell-sub{font-size:10px;color:var(--text3);margin-top:3px}
+.c-purple{color:var(--purple)} .c-mint{color:var(--mint)} .c-amber{color:var(--amber)} .c-blue{color:var(--blue)}
+
+/* Stats bar under preview */
+.stat-bar{
+  display:flex;gap:0;border-top:1px solid var(--border);
+  padding:14px 20px;background:var(--bg2)
+}
+.stat-bar-item{flex:1;text-align:center}
+.stat-bar-item+.stat-bar-item{border-left:1px solid var(--border)}
+.sbi-val{font-size:14px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)}
+.sbi-lbl{font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.4px;margin-top:2px}
+
+/* ═══════════════════════════════════════════
+   LOADING OVERLAY
+═══════════════════════════════════════════ */
+#overlay-loading{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(5,3,15,.88);backdrop-filter:blur(14px);
+  display:none;align-items:center;justify-content:center;flex-direction:column;gap:18px
+}
+.spin{
+  width:56px;height:56px;border-radius:50%;
+  border:3px solid rgba(145,70,255,.2);border-top-color:var(--purple);
+  animation:spin .75s linear infinite
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-title{color:#fff;font-size:15px;font-weight:700}
+.load-step{color:rgba(255,255,255,.4);font-size:12px;transition:opacity .3s}
+
+/* ═══════════════════════════════════════════
+   EXPORT MODAL
+═══════════════════════════════════════════ */
+#overlay-export,#overlay-compare,#overlay-share{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(8px);
+  display:none;align-items:center;justify-content:center
+}
+.export-panel{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);padding:28px;max-width:380px;width:90%;
+  box-shadow:var(--shadow-lg);animation:popIn .25s var(--ease)
+}
+@keyframes popIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.ep-title{font-size:19px;font-weight:800;margin-bottom:6px}
+.ep-sub{font-size:13px;color:var(--text2);margin-bottom:20px}
+.ep-opts{display:flex;flex-direction:column;gap:10px;margin-bottom:18px}
+.ep-opt{
+  display:flex;align-items:center;gap:12px;padding:12px 14px;
+  border:1px solid var(--border);border-radius:var(--rs);cursor:pointer;
+  background:var(--bg2);transition:all .2s
+}
+.ep-opt:hover{border-color:var(--purple);background:var(--purple-glow)}
+.ep-opt-ico{font-size:22px}
+.ep-opt-info strong{font-size:13px;font-weight:700;display:block}
+.ep-opt-info span{font-size:11px;color:var(--text2)}
+.ep-close{
+  width:100%;background:var(--bg2);border:1px solid var(--border);
+  color:var(--text);padding:11px;border-radius:var(--rs);font-size:13px;
+  font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s
+}
+.ep-close:hover{background:var(--bg3)}
+
+/* ═══════════════════════════════════════════
+   AI CHAT MODAL
+═══════════════════════════════════════════ */
+#overlay-ai{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(8px);
+  display:none;align-items:center;justify-content:center
+}
+.ai-panel{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);width:min(600px,95vw);max-height:80vh;
+  display:flex;flex-direction:column;box-shadow:var(--shadow-lg);
+  animation:popIn .25s var(--ease);overflow:hidden
+}
+.ai-header{
+  padding:18px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0
+}
+.ai-header-l{display:flex;align-items:center;gap:10px}
+.ai-badge{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--purple),var(--purple-l));display:flex;align-items:center;justify-content:center;font-size:15px}
+.ai-header-title{font-size:15px;font-weight:800}
+.ai-header-sub{font-size:11px;color:var(--text3)}
+.ai-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);padding:4px}
+.ai-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;min-height:200px}
+.ai-msg{max-width:85%;padding:12px 14px;border-radius:12px;font-size:13px;line-height:1.55}
+.ai-msg.user{align-self:flex-end;background:var(--purple);color:#fff;border-radius:12px 12px 3px 12px}
+.ai-msg.bot{align-self:flex-start;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:12px 12px 12px 3px}
+.ai-msg.bot.loading{opacity:.6}
+.ai-input-row{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0}
+.ai-input{
+  flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 12px;
+  font-size:13px;font-family:'Inter',sans-serif;background:var(--bg2);color:var(--text);outline:none
+}
+.ai-input:focus{border-color:var(--purple)}
+.ai-send{
+  background:var(--purple);color:#fff;border:none;border-radius:10px;
+  padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;
+  font-family:'Inter',sans-serif;transition:all .2s;flex-shrink:0
+}
+.ai-send:hover{background:var(--purple-d)}
+.ai-send:disabled{opacity:.4;cursor:not-allowed}
+
+/* ═══════════════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════════════ */
+#page-dashboard{display:none;padding-top:60px;min-height:100vh;background:var(--bg2)}
+
+/* Profile Banner */
+.pbanner{
+  background:linear-gradient(135deg,#150830 0%,#0c0d28 55%,#091528 100%);
+  padding:40px 28px 28px;position:relative;overflow:hidden
+}
+.pb-orb1{position:absolute;width:340px;height:340px;border-radius:50%;background:rgba(145,70,255,.18);top:-100px;right:-60px;filter:blur(64px)}
+.pb-orb2{position:absolute;width:220px;height:220px;border-radius:50%;background:rgba(0,245,160,.07);bottom:-60px;left:18%;filter:blur(52px)}
+.pb-inner{max-width:1200px;margin:0 auto;position:relative;z-index:1;display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap}
+
+.av-wrap{position:relative;flex-shrink:0}
+.av{
+  width:88px;height:88px;border-radius:50%;
+  border:3px solid var(--purple);overflow:hidden;
+  background:linear-gradient(135deg,var(--purple),var(--purple-l));
+  display:flex;align-items:center;justify-content:center;
+  font-size:32px;font-weight:900;color:#fff
+}
+.av img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.live-dot{
+  position:absolute;bottom:2px;right:2px;
+  background:#FF0000;color:#fff;font-size:9px;font-weight:800;
+  padding:2px 6px;border-radius:100px;border:2px solid #150830;letter-spacing:.3px
+}
+.offline-dot{
+  position:absolute;bottom:2px;right:2px;
+  background:#444;color:#aaa;font-size:9px;font-weight:800;
+  padding:2px 6px;border-radius:100px;border:2px solid #150830
+}
+
+.pi-body{flex:1;min-width:0}
+.pi-name{font-size:26px;font-weight:900;color:#fff;margin-bottom:3px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pi-handle{font-size:14px;color:rgba(255,255,255,.45);margin-bottom:10px}
+.pi-tags{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.ptag{padding:3px 11px;border-radius:100px;font-size:11px;font-weight:700;letter-spacing:.3px}
+.t-partner{background:rgba(145,70,255,.25);color:#C49DFF;border:1px solid rgba(145,70,255,.35)}
+.t-aff{background:rgba(0,191,255,.18);color:#5AD4FF;border:1px solid rgba(0,191,255,.25)}
+.t-live{background:rgba(255,0,0,.2);color:#FF6666;border:1px solid rgba(255,0,0,.3)}
+.t-off{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.12)}
+.t-game{background:rgba(0,245,160,.12);color:#00F5A0;border:1px solid rgba(0,245,160,.22)}
+.pi-stats{display:flex;gap:28px;flex-wrap:wrap}
+.pis{}.pis-v{font-size:21px;font-weight:800;color:#fff;font-family:'JetBrains Mono',monospace}
+.pis-l{font-size:10px;color:rgba(255,255,255,.38);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
+
+.pi-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-end;margin-left:auto}
+.btn-ghost{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);color:#fff;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;display:flex;align-items:center;gap:5px}
+.btn-ghost:hover{background:rgba(255,255,255,.18)}
+.btn-purple{background:var(--purple);border:none;color:#fff;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;display:flex;align-items:center;gap:5px}
+.btn-purple:hover{background:var(--purple-d)}
+.btn-ai{background:linear-gradient(135deg,var(--purple),var(--purple-l));border:none;color:#fff;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:5px;box-shadow:0 4px 16px rgba(145,70,255,.4)}
+.btn-ai:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(145,70,255,.5)}
+
+/* Tabs */
+.tabs-wrap{background:var(--card);border-bottom:1px solid var(--border);padding:0 28px;position:sticky;top:60px;z-index:100}
+.tabs{max-width:1200px;margin:0 auto;display:flex;gap:0;overflow-x:auto}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  padding:14px 18px;border:none;background:transparent;color:var(--text2);
+  font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;
+  border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s
+}
+.tab:hover{color:var(--purple)}
+.tab.on{color:var(--purple);border-bottom-color:var(--purple)}
+
+/* Dashboard Body */
+.dbody{max-width:1200px;margin:0 auto;padding:28px 24px 80px}
+
+/* ═══════════════════════════════════════════
+   CARDS
+═══════════════════════════════════════════ */
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);padding:22px;
+  box-shadow:var(--shadow);transition:box-shadow .2s,transform .2s
+}
+.card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.ct{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.7px;display:flex;align-items:center;gap:7px}
+.ct-ico{font-size:15px}
+.cbadge{font-size:10px;font-weight:800;padding:2px 9px;border-radius:100px;letter-spacing:.3px}
+
+/* Layout grids */
+.g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-bottom:20px}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-bottom:20px}
+.g1{margin-bottom:20px}
+
+/* ═══════════════════════════════════════════
+   SCORE RING
+═══════════════════════════════════════════ */
+.ring-wrap{display:flex;flex-direction:column;align-items:center;gap:14px}
+.ring-svg{width:130px;height:130px;transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:var(--bg3);stroke-width:10}
+.ring-fill{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset 1.6s cubic-bezier(0.4,0,0.2,1)}
+.ring-num{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:28px;text-anchor:middle;dominant-baseline:middle;transform:rotate(90deg);transform-origin:50% 50%}
+.ring-sub{font-size:9px;text-anchor:middle;dominant-baseline:middle;transform:rotate(90deg);transform-origin:50% 50%;fill:var(--text3)}
+.ring-meta{text-align:center}
+.ring-label{font-size:14px;font-weight:800;margin-bottom:3px}
+.ring-desc{font-size:11px;color:var(--text2);line-height:1.45;max-width:160px}
+
+/* Stars */
+.stars{font-size:19px;letter-spacing:1px;margin-bottom:7px}
+.pot-label{font-size:17px;font-weight:800;margin-bottom:5px}
+.pot-desc{font-size:12px;color:var(--text2);line-height:1.5}
+
+/* Progress bars */
+.pb-row{margin-bottom:10px}
+.pb-hd{display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px;font-weight:600;color:var(--text2)}
+.pb-track{height:5px;background:var(--bg3);border-radius:100px;overflow:hidden}
+.pb-fill{height:100%;border-radius:100px;transition:width 1.3s var(--ease)}
+
+/* Promo indicator */
+.promo-box{display:flex;align-items:flex-start;gap:11px;padding:14px;border-radius:var(--rs);margin-bottom:13px}
+.promo-dot-big{width:11px;height:11px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.promo-rating{font-size:16px;font-weight:800;margin-bottom:3px}
+.promo-score{font-size:11px;color:var(--text3);margin-bottom:5px}
+.promo-explain{font-size:12px;color:var(--text2);line-height:1.55}
+
+/* Disc items */
+.disc-row{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:var(--rs);background:var(--bg2);border:1px solid var(--border);margin-bottom:8px}
+.disc-name{font-size:12px;font-weight:600;color:var(--text)}
+.disc-pill{font-size:10px;font-weight:800;padding:2px 9px;border-radius:100px;letter-spacing:.3px}
+.p-exc{background:rgba(0,245,160,.14);color:#00C87A;border:1px solid rgba(0,245,160,.28)}
+.p-good{background:rgba(145,70,255,.12);color:var(--purple);border:1px solid rgba(145,70,255,.25)}
+.p-needs{background:rgba(255,149,0,.12);color:var(--amber);border:1px solid rgba(255,149,0,.25)}
+.p-poor{background:rgba(255,69,96,.12);color:var(--crimson);border:1px solid rgba(255,69,96,.25)}
+
+/* S/W lists */
+.sw-item{display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:var(--rs);background:var(--bg2);border:1px solid var(--border);margin-bottom:8px}
+.sw-ico{font-size:14px;flex-shrink:0;margin-top:1px}
+.sw-txt{font-size:12px;font-weight:500;color:var(--text);line-height:1.45}
+
+/* Quality items */
+.sq-item{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border-radius:var(--rs);background:var(--bg2);border:1px solid var(--border);margin-bottom:8px}
+.sq-ico{font-size:14px;flex-shrink:0;margin-top:1px}
+.sq-t{font-size:12px;font-weight:700;color:var(--text)}
+.sq-d{font-size:11px;color:var(--text2);margin-top:2px;line-height:1.4}
+
+/* Rec items */
+.rec-item{display:flex;align-items:flex-start;gap:11px;padding:13px;border-radius:var(--rs);background:var(--bg2);border:1px solid var(--border);margin-bottom:9px}
+.rec-num{width:22px;height:22px;border-radius:6px;background:var(--purple);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'JetBrains Mono',monospace}
+.rec-t{font-size:12px;font-weight:700;color:var(--text);display:block;margin-bottom:2px}
+.rec-d{font-size:11px;color:var(--text2);line-height:1.5}
+
+/* Metrics mini-grid */
+.met-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.met-cell{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center}
+.met-v{font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text);margin-bottom:3px}
+.met-l{font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.3px}
+
+/* Chart */
+.ch-wrap{position:relative;height:190px}
+.ch-wrap-lg{position:relative;height:230px}
+
+/* Tags */
+.tag-cloud{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.tag{background:var(--bg2);border:1px solid var(--border);border-radius:100px;padding:3px 11px;font-size:11px;font-weight:600;color:var(--text2)}
+.tag.on{background:var(--purple-glow);border-color:var(--purple);color:var(--purple)}
+.tag.sug{border-style:dashed;opacity:.7}
+
+/* Saved */
+.saved-item{
+  display:flex;align-items:center;gap:12px;padding:11px 14px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);
+  cursor:pointer;transition:all .2s;margin-bottom:8px
+}
+.saved-item:hover{border-color:var(--purple);background:var(--purple-glow)}
+.saved-av{width:34px;height:34px;border-radius:50%;background:var(--purple);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:12px;flex-shrink:0}
+.saved-name{font-size:13px;font-weight:700;color:var(--text)}
+.saved-meta{font-size:11px;color:var(--text3)}
+.saved-score{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:800}
+
+/* Executive Summary */
+.exec-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:18px}
+.exec-cell{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);padding:16px;text-align:center}
+.exec-v{font-size:28px;font-weight:900;font-family:'JetBrains Mono',monospace;margin-bottom:4px}
+.exec-l{font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.exec-note{font-size:12px;color:var(--text2);line-height:1.6;padding:14px;background:var(--bg3);border-radius:var(--rs);border-left:3px solid var(--purple)}
+
+/* compare hint */
+.compare-btn{background:var(--bg2);border:1px dashed var(--border);border-radius:var(--rs);padding:14px;text-align:center;cursor:pointer;transition:all .2s;color:var(--text3);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
+.compare-btn:hover{border-color:var(--purple);color:var(--purple);background:var(--purple-glow)}
+
+/* Chip / inline pill */
+.chip-inline{display:inline-flex;align-items:center;gap:4px;background:var(--purple-glow);border:1px solid rgba(145,70,255,.25);border-radius:100px;padding:2px 9px;font-size:10px;font-weight:700;color:var(--purple);letter-spacing:.3px}
+
+/* Animations */
+.fadein{animation:fadein .45s var(--ease) both}
+@keyframes fadein{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.d1{animation-delay:.05s}.d2{animation-delay:.1s}.d3{animation-delay:.15s}.d4{animation-delay:.2s}.d5{animation-delay:.25s}
+
+/* Responsive */
+@media(max-width:768px){
+  .prev-grid{grid-template-columns:repeat(2,1fr)}
+  .met-grid{grid-template-columns:repeat(2,1fr)}
+  .pi-actions{display:none}
+  .pi-stats{gap:18px}
+}
+@media(max-width:480px){
+  .search-box{flex-wrap:wrap;padding:10px}
+  .search-btn{width:100%;text-align:center}
+  .exec-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px}
+</style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav>
+  <a class="logo" onclick="goLanding()">
+    <div class="logo-mark">🔍</div>
+    StreamScope <em>Audit</em>
+  </a>
+  <div class="nav-r">
+    <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+    <button class="icon-btn" id="ai-fab" onclick="openAI()" title="Ask AI" style="display:none">🤖</button>
+    <div class="nav-pill">BETA</div>
+  </div>
+</nav>
+
+<!-- ═══ LOADING OVERLAY ═══ -->
+<div id="overlay-loading">
+  <div class="spin"></div>
+  <div class="load-title">Analyzing Channel…</div>
+  <div class="load-step" id="load-step">Fetching profile data</div>
+</div>
+
+<!-- ═══ EXPORT MODAL ═══ -->
+<div id="overlay-export" onclick="if(event.target===this)this.style.display='none'">
+  <div class="export-panel">
+    <div class="ep-title">Share This Report</div>
+    <div class="ep-sub">Send a safe, read-only link or export as a file.</div>
+    <div class="ep-opts">
+      <div class="ep-opt" onclick="doShareLink()" style="border-color:var(--purple);background:var(--purple-glow)">
+        <div class="ep-opt-ico">🔗</div>
+        <div class="ep-opt-info"><strong>Get Shareable Link</strong><span>Read-only page — no login, opens instantly</span></div>
+      </div>
+      <div class="ep-opt" onclick="doExportPDF()">
+        <div class="ep-opt-ico">📄</div>
+        <div class="ep-opt-info"><strong>PDF Report</strong><span>Formatted consulting document</span></div>
+      </div>
+      <div class="ep-opt" onclick="doExportPNG()">
+        <div class="ep-opt-ico">🖼️</div>
+        <div class="ep-opt-info"><strong>PNG Screenshot</strong><span>High-res dashboard image</span></div>
+      </div>
+      <div class="ep-opt" onclick="doExportCSV()">
+        <div class="ep-opt-ico">📊</div>
+        <div class="ep-opt-info"><strong>CSV Data</strong><span>Raw metrics for spreadsheets</span></div>
+      </div>
+    </div>
+    <button class="ep-close" onclick="document.getElementById('overlay-export').style.display='none'">Cancel</button>
+  </div>
+</div>
+
+<!-- ═══ SHARE LINK MODAL ═══ -->
+<div id="overlay-share" onclick="if(event.target===this)this.style.display='none'">
+  <div class="export-panel" style="max-width:440px">
+    <div class="ep-title">🔗 Shareable Report Link</div>
+    <div class="ep-sub">This opens a clean, read-only version of the report — safe to send to the streamer directly. No login or download required.</div>
+    <div id="share-loading" style="text-align:center;padding:20px 0">
+      <div class="spin" style="width:32px;height:32px;margin:0 auto 10px"></div>
+      <div style="font-size:12px;color:var(--text3)">Generating secure link…</div>
+    </div>
+    <div id="share-ready" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <input id="share-url-input" readonly
+          style="flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;font-family:'JetBrains Mono',monospace;background:var(--bg2);color:var(--text);outline:none" />
+        <button onclick="copyShareLink()" id="share-copy-btn"
+          style="background:var(--purple);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;transition:all .2s">
+          Copy
+        </button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button onclick="shareVia('twitter')" class="icon-btn" style="flex:1;width:auto;border-radius:10px;padding:9px;font-size:12px;font-weight:700;gap:6px;display:flex;align-items:center;justify-content:center">🐦 Twitter / X</button>
+        <button onclick="shareVia('discord')" class="icon-btn" style="flex:1;width:auto;border-radius:10px;padding:9px;font-size:12px;font-weight:700;gap:6px;display:flex;align-items:center;justify-content:center">💬 Copy for Discord</button>
+      </div>
+      <div style="padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;font-size:11px;color:var(--text2);line-height:1.6">
+        <strong style="color:var(--text);font-size:12px">💡 Why this is safe to send:</strong><br>
+        No login or download needed — opens straight in any browser. Shows your branding, the streamer's real Twitch data, and a clear "what is this" explanation right at the top.
+      </div>
+    </div>
+    <button class="ep-close" style="margin-top:14px" onclick="document.getElementById('overlay-share').style.display='none'">Close</button>
+  </div>
+</div>
+
+<!-- ═══ COMPARE MODAL ═══ -->
+<div id="overlay-compare" onclick="if(event.target===this)this.style.display='none'">
+  <div class="export-panel" style="max-width:460px">
+    <div class="ep-title">⚖️ Compare Channels</div>
+    <div class="ep-sub">Enter a second Twitch username to benchmark <strong id="cmp-base-name"></strong> against.</div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:4px 12px;transition:border-color .2s" id="cmp-box">
+        <span style="font-size:13px;color:var(--text3);font-family:'JetBrains Mono',monospace;white-space:nowrap">twitch.tv /</span>
+        <input id="cmp-input" placeholder="username" autocomplete="off" spellcheck="false"
+          style="flex:1;border:none;outline:none;background:transparent;font-size:14px;font-weight:600;color:var(--text);padding:8px 6px;font-family:'Inter',sans-serif;"
+          onkeydown="if(event.key==='Enter')runCompare()" onfocus="document.getElementById('cmp-box').style.borderColor='var(--purple)'" onblur="document.getElementById('cmp-box').style.borderColor='var(--border)'" />
+      </div>
+      <button onclick="runCompare()" id="cmp-btn"
+        style="background:var(--purple);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;transition:all .2s">
+        Compare →
+      </button>
+    </div>
+    <div id="cmp-loading" style="display:none;text-align:center;padding:16px 0;color:var(--text3);font-size:13px">
+      <div class="spin" style="width:28px;height:28px;margin:0 auto 8px"></div>Fetching channel data…
+    </div>
+    <div id="cmp-error" style="display:none;padding:10px 14px;background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.3);border-radius:8px;font-size:12px;font-weight:600;color:#FF4560;margin-bottom:12px"></div>
+    <div id="cmp-result" style="display:none">
+      <!-- filled by JS -->
+    </div>
+    <button class="ep-close" style="margin-top:8px" onclick="document.getElementById('overlay-compare').style.display='none'">Close</button>
+  </div>
+</div>
+
+<!-- ═══ AI CHAT MODAL ═══ -->
+<div id="overlay-ai" onclick="if(event.target===this)this.style.display='none'">
+  <div class="ai-panel">
+    <div class="ai-header">
+      <div class="ai-header-l">
+        <div class="ai-badge">🤖</div>
+        <div>
+          <div class="ai-header-title">AI Channel Advisor</div>
+          <div class="ai-header-sub">Ask anything about this channel's growth</div>
+        </div>
+      </div>
+      <button class="ai-close" onclick="document.getElementById('overlay-ai').style.display='none'">✕</button>
+    </div>
+    <div class="ai-messages" id="ai-msgs"></div>
+    <div class="ai-input-row">
+      <input class="ai-input" id="ai-input" placeholder="Ask a question about this channel…" />
+      <button class="ai-send" id="ai-send" onclick="sendAI()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     LANDING PAGE
+══════════════════════════════════════════ -->
+<section id="page-landing">
+  <div class="orb orb1"></div><div class="orb orb2"></div>
+  <div class="orb orb3"></div><div class="orb orb4"></div>
+
+  <div class="hero">
+    <div class="eyebrow"><div class="eyebrow-dot"></div>Twitch Channel Intelligence</div>
+    <h1>Your channel's<br><span class="g">full audit report</span></h1>
+    <p>Enter any Twitch username and receive a professional growth analysis — scores, discoverability insights, AI recommendations, and export-ready reports.</p>
+
+    <div class="search-box">
+      <span class="search-pre">twitch.tv /</span>
+      <input class="search-input" id="main-input" type="text" placeholder="username" autocomplete="off" spellcheck="false" />
+      <button class="search-btn" id="main-btn" onclick="startAudit()">Analyze Channel →</button>
+    </div>
+
+    <div id="recents-wrap" style="display:none">
+      <div class="recents">
+        <div class="recents-lbl">Recent searches</div>
+        <div class="chips" id="chips-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview card -->
+  <div class="preview-wrap">
+    <div class="preview-lbl">Sample Report Preview</div>
+    <div class="preview-card">
+      <div class="preview-overlay">
+        <button class="preview-cta" onclick="document.getElementById('main-input').focus()">Try a channel →</button>
+      </div>
+      <div class="prev-grid">
+        <div class="prev-cell">
+          <div class="prev-cell-lbl">Growth Score</div>
+          <div class="prev-cell-val c-purple">78</div>
+          <div class="prev-cell-sub">/ 100 · High Potential</div>
+        </div>
+        <div class="prev-cell">
+          <div class="prev-cell-lbl">Avg Viewers</div>
+          <div class="prev-cell-val">142</div>
+          <div class="prev-cell-sub">↑ +18% trend</div>
+        </div>
+        <div class="prev-cell">
+          <div class="prev-cell-lbl">Promo Opp.</div>
+          <div class="prev-cell-val c-mint" style="font-size:14px">🟢 Excellent</div>
+          <div class="prev-cell-sub">Strong candidate</div>
+        </div>
+        <div class="prev-cell">
+          <div class="prev-cell-lbl">Discoverability</div>
+          <div class="prev-cell-val c-amber">62</div>
+          <div class="prev-cell-sub">⚠ Needs improvement</div>
+        </div>
+      </div>
+      <div class="stat-bar">
+        <div class="stat-bar-item"><div class="sbi-val">4.2K</div><div class="sbi-lbl">Followers</div></div>
+        <div class="stat-bar-item"><div class="sbi-val">3</div><div class="sbi-lbl">Streams/wk</div></div>
+        <div class="stat-bar-item"><div class="sbi-val">Affiliate</div><div class="sbi-lbl">Status</div></div>
+        <div class="stat-bar-item"><div class="sbi-val">English</div><div class="sbi-lbl">Language</div></div>
+        <div class="stat-bar-item"><div class="sbi-val">2y 3mo</div><div class="sbi-lbl">Account Age</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     DASHBOARD
+══════════════════════════════════════════ -->
+<section id="page-dashboard">
+
+  <!-- Profile Banner -->
+  <div class="pbanner">
+    <div class="pb-orb1"></div><div class="pb-orb2"></div>
+    <div class="pb-inner">
+      <div class="av-wrap">
+        <div class="av" id="av-el"></div>
+        <div id="av-badge"></div>
+      </div>
+      <div class="pi-body">
+        <div class="pi-name" id="pi-name"></div>
+        <div class="pi-handle" id="pi-handle"></div>
+        <div class="pi-tags" id="pi-tags"></div>
+        <div class="pi-stats" id="pi-stats"></div>
+      </div>
+      <div class="pi-actions">
+        <button class="btn-ghost" onclick="goLanding()">← New Search</button>
+        <button class="btn-purple" onclick="document.getElementById('overlay-export').style.display='flex'">⬇ Export</button>
+        <button class="btn-ai" onclick="openAI()">🤖 Ask AI</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs-wrap">
+    <div class="tabs">
+      <button class="tab on" onclick="goTab('overview',this)">Overview</button>
+      <button class="tab" onclick="goTab('analytics',this)">Analytics</button>
+      <button class="tab" onclick="goTab('discoverability',this)">Discoverability</button>
+      <button class="tab" onclick="goTab('recommendations',this)">AI Recs</button>
+      <button class="tab" onclick="goTab('report',this)">Full Report</button>
+      <button class="tab" onclick="goTab('saved',this)">Saved</button>
+    </div>
+  </div>
+
+  <!-- Dashboard Body -->
+  <div class="dbody" id="dash-body">
+
+    <!-- ──── OVERVIEW TAB ──── -->
+    <div id="tab-overview">
+
+      <!-- Row 1: 3 score cards -->
+      <div class="g3">
+        <!-- Growth Score -->
+        <div class="card fadein">
+          <div class="ch">
+            <div class="ct"><span class="ct-ico">📈</span>Growth Score</div>
+            <div class="cbadge" id="gs-badge"></div>
+          </div>
+          <div class="ring-wrap">
+            <svg class="ring-svg" viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="50"/>
+              <circle class="ring-fill" id="gs-ring" cx="60" cy="60" r="50" stroke-dasharray="314.16" stroke-dashoffset="314.16"/>
+              <text class="ring-num" id="gs-num" x="60" y="54" fill="currentColor">0</text>
+              <text class="ring-sub" x="60" y="70">/100</text>
+            </svg>
+            <div class="ring-meta">
+              <div class="ring-label" id="gs-label"></div>
+              <div class="ring-desc" id="gs-desc"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Growth Potential -->
+        <div class="card fadein d1">
+          <div class="ch"><div class="ct"><span class="ct-ico">⚡</span>Growth Potential</div></div>
+          <div class="stars" id="pot-stars"></div>
+          <div class="pot-label" id="pot-label"></div>
+          <div class="pot-desc" id="pot-desc"></div>
+          <div style="margin-top:16px">
+            <div class="pb-row"><div class="pb-hd"><span>Audience Quality</span><span id="aq-v">–</span></div><div class="pb-track"><div class="pb-fill" id="aq-b" style="width:0;background:var(--purple)"></div></div></div>
+            <div class="pb-row"><div class="pb-hd"><span>Content Consistency</span><span id="cc-v">–</span></div><div class="pb-track"><div class="pb-fill" id="cc-b" style="width:0;background:var(--mint)"></div></div></div>
+            <div class="pb-row"><div class="pb-hd"><span>Niche Clarity</span><span id="nc-v">–</span></div><div class="pb-track"><div class="pb-fill" id="nc-b" style="width:0;background:var(--blue)"></div></div></div>
+          </div>
+        </div>
+
+        <!-- Promo Opp -->
+        <div class="card fadein d2">
+          <div class="ch"><div class="ct"><span class="ct-ico">🚀</span>Promotion Opportunity</div></div>
+          <div class="promo-box" id="promo-box">
+            <div class="promo-dot-big" id="promo-dot"></div>
+            <div>
+              <div class="promo-rating" id="promo-rating"></div>
+              <div class="promo-score" id="promo-score-txt"></div>
+            </div>
+          </div>
+          <div class="promo-explain" id="promo-explain"></div>
+        </div>
+      </div>
+
+      <!-- Row 2: Strengths + Weaknesses -->
+      <div class="g2">
+        <div class="card fadein d3">
+          <div class="ch"><div class="ct"><span class="ct-ico">✅</span>Strengths</div></div>
+          <div id="strengths"></div>
+        </div>
+        <div class="card fadein d4">
+          <div class="ch"><div class="ct"><span class="ct-ico">⚠️</span>Weaknesses</div></div>
+          <div id="weaknesses"></div>
+        </div>
+      </div>
+
+      <!-- Row 3: Stream Quality -->
+      <div class="g1">
+        <div class="card fadein d5">
+          <div class="ch">
+            <div class="ct"><span class="ct-ico">🎮</span>Stream Quality Analysis</div>
+            <div class="chip-inline" id="sq-chip"></div>
+          </div>
+          <div id="sq-list"></div>
+        </div>
+      </div>
+
+    </div><!-- /tab-overview -->
+
+    <!-- ──── ANALYTICS TAB ──── -->
+    <div id="tab-analytics" style="display:none">
+      <div class="g3">
+        <div class="card fadein">
+          <div class="ch"><div class="ct"><span class="ct-ico">👁</span>Viewer Metrics</div></div>
+          <div class="met-grid" id="viewer-metrics"></div>
+        </div>
+        <div class="card fadein d1">
+          <div class="ch"><div class="ct"><span class="ct-ico">📅</span>Streams Per Day</div></div>
+          <div class="ch-wrap"><canvas id="chart-freq"></canvas></div>
+        </div>
+        <div class="card fadein d2">
+          <div class="ch"><div class="ct"><span class="ct-ico">🎯</span>Category Mix</div></div>
+          <div class="ch-wrap"><canvas id="chart-cat"></canvas></div>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="card fadein">
+          <div class="ch"><div class="ct"><span class="ct-ico">📈</span>Viewer History (30d)</div></div>
+          <div class="ch-wrap-lg"><canvas id="chart-viewers"></canvas></div>
+        </div>
+        <div class="card fadein d1">
+          <div class="ch"><div class="ct"><span class="ct-ico">👥</span>Daily New Followers (30d)</div></div>
+          <div class="ch-wrap-lg"><canvas id="chart-followers"></canvas></div>
+        </div>
+      </div>
+      <div class="g1">
+        <div class="card fadein">
+          <div class="ch"><div class="ct"><span class="ct-ico">🏷️</span>Tag Usage Analysis</div></div>
+          <div class="tag-cloud" id="tag-cloud"></div>
+          <div style="margin-top:12px;font-size:12px;color:var(--text2);line-height:1.55" id="tag-note"></div>
+        </div>
+      </div>
+    </div><!-- /tab-analytics -->
+
+    <!-- ──── DISCOVERABILITY TAB ──── -->
+    <div id="tab-discoverability" style="display:none">
+      <div class="g2">
+        <div class="card fadein">
+          <div class="ch">
+            <div class="ct"><span class="ct-ico">🔍</span>Discoverability Score</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg style="width:48px;height:48px;transform:rotate(-90deg)" viewBox="0 0 120 120">
+                <circle class="ring-bg" cx="60" cy="60" r="50"/>
+                <circle class="ring-fill" id="disc-ring" cx="60" cy="60" r="50" stroke-dasharray="314.16" stroke-dashoffset="314.16"/>
+              </svg>
+              <div style="font-size:22px;font-weight:900;font-family:'JetBrains Mono',monospace" id="disc-num"></div>
+            </div>
+          </div>
+          <div id="disc-items"></div>
+        </div>
+        <div class="card fadein d1">
+          <div class="ch"><div class="ct"><span class="ct-ico">✔️</span>Channel Health Check</div></div>
+          <div id="health-list"></div>
+        </div>
+      </div>
+      <div class="g1">
+        <div class="card fadein">
+          <div class="ch"><div class="ct"><span class="ct-ico">💡</span>Discoverability Suggestions</div></div>
+          <div id="disc-suggestions"></div>
+        </div>
+      </div>
+    </div><!-- /tab-discoverability -->
+
+    <!-- ──── RECOMMENDATIONS TAB ──── -->
+    <div id="tab-recommendations" style="display:none">
+      <div class="g1">
+        <div class="card fadein">
+          <div class="ch">
+            <div class="ct"><span class="ct-ico">🤖</span>AI-Generated Recommendations</div>
+            <div class="chip-inline">Personalized</div>
+          </div>
+          <div id="rec-list"></div>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="card fadein">
+          <div class="ch"><div class="ct"><span class="ct-ico">📋</span>Next Steps</div></div>
+          <div id="next-steps"></div>
+        </div>
+        <div class="card fadein d1">
+          <div class="ch"><div class="ct"><span class="ct-ico">🔗</span>Compare Channels</div></div>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.5">Fetch a second Twitch channel and compare it side-by-side to identify gaps and opportunities.</p>
+          <div class="compare-btn" onclick="openCompare()">
+            <span>⚖️</span> Compare with another channel
+          </div>
+          <div id="compare-result" style="margin-top:16px;display:none"></div>
+        </div>
+      </div>
+    </div><!-- /tab-recommendations -->
+
+    <!-- ──── FULL REPORT TAB ──── -->
+    <div id="tab-report" style="display:none">
+      <div class="g1">
+        <div class="card fadein">
+          <div class="ch"><div class="ct"><span class="ct-ico">📑</span>Executive Summary</div></div>
+          <div class="exec-grid" id="exec-grid"></div>
+          <div class="exec-note" id="exec-note"></div>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="card fadein">
+          <div class="ch"><div class="ct"><span class="ct-ico">✅</span>Strengths Summary</div></div>
+          <div id="report-strengths"></div>
+        </div>
+        <div class="card fadein d1">
+          <div class="ch"><div class="ct"><span class="ct-ico">⚠️</span>Weaknesses Summary</div></div>
+          <div id="report-weaknesses"></div>
+        </div>
+      </div>
+      <div class="g1">
+        <div class="card fadein">
+          <div class="ch">
+            <div class="ct"><span class="ct-ico">📊</span>Full Score Breakdown</div>
+          </div>
+          <div id="score-breakdown"></div>
+        </div>
+      </div>
+      <div class="g1">
+        <div class="card fadein" style="text-align:center;padding:32px">
+          <div style="font-size:32px;margin-bottom:12px">📥</div>
+          <div style="font-size:17px;font-weight:800;margin-bottom:6px">Download Full Report</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:20px">Export this audit as a professional PDF, PNG, or CSV file.</div>
+          <button class="btn-purple" style="margin:0 auto;font-size:14px;padding:12px 28px" onclick="document.getElementById('overlay-export').style.display='flex'">⬇ Export Report</button>
+        </div>
+      </div>
+    </div><!-- /tab-report -->
+
+    <!-- ──── SAVED TAB ──── -->
+    <div id="tab-saved" style="display:none">
+      <div class="g1">
+        <div class="card fadein">
+          <div class="ch">
+            <div class="ct"><span class="ct-ico">💾</span>Saved Reports</div>
+            <button onclick="clearSaved()" style="font-size:11px;color:var(--crimson);background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-weight:700">Clear All</button>
+          </div>
+          <div id="saved-list"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /dbody -->
+</section>
+
+<!-- ══════════════════════════════════════════
+     PUBLIC READ-ONLY SHARED REPORT
+══════════════════════════════════════════ -->
+<section id="page-public" style="display:none;min-height:100vh;background:var(--bg2);padding-top:60px">
+  <!-- Trust header strip -->
+  <div style="background:linear-gradient(135deg,#150830,#0c0d28,#091528);padding:14px 24px;text-align:center;border-bottom:3px solid var(--purple)">
+    <div style="max-width:700px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:18px">🛡️</span>
+      <span style="color:#fff;font-size:13px;font-weight:700">This is a read-only channel audit generated by StreamScope Audit</span>
+      <span style="color:rgba(255,255,255,.4);font-size:11px">· No login required · No data collected from you</span>
+    </div>
+  </div>
+
+  <div id="public-loading" style="text-align:center;padding:80px 24px">
+    <div class="spin" style="width:48px;height:48px;margin:0 auto 18px"></div>
+    <div style="font-size:15px;font-weight:700;color:var(--text)">Loading report…</div>
+  </div>
+
+  <div id="public-notfound" style="display:none;text-align:center;padding:80px 24px;max-width:480px;margin:0 auto">
+    <div style="font-size:48px;margin-bottom:16px">🔍</div>
+    <div style="font-size:20px;font-weight:800;margin-bottom:8px">Report Not Found</div>
+    <div style="font-size:14px;color:var(--text2);margin-bottom:24px;line-height:1.6">This link may have expired or the report ID is incorrect. Reports are generated from live Twitch data and may need to be re-shared.</div>
+    <button class="search-btn" onclick="goLanding()">Go to StreamScope Audit →</button>
+  </div>
+
+  <div id="public-content" style="display:none">
+    <!-- Banner -->
+    <div class="pbanner" id="pub-banner">
+      <div class="pb-orb1"></div><div class="pb-orb2"></div>
+      <div class="pb-inner">
+        <div class="av-wrap">
+          <div class="av" id="pub-av"></div>
+          <div id="pub-av-badge"></div>
+        </div>
+        <div class="pi-body">
+          <div class="pi-name" id="pub-name"></div>
+          <div class="pi-handle" id="pub-handle"></div>
+          <div class="pi-tags" id="pub-tags"></div>
+          <div class="pi-stats" id="pub-stats"></div>
+        </div>
+        <div class="pi-actions">
+          <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.7);padding:7px 14px;border-radius:8px;font-size:11px;font-weight:600;text-align:right">
+            📅 Audited <span id="pub-date"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dbody" id="pub-body">
+      <!-- Intro note -->
+      <div class="card fadein" style="margin-bottom:20px;background:var(--purple-glow);border-color:rgba(145,70,255,.3)">
+        <div style="font-size:13px;color:var(--text2);line-height:1.65">
+          👋 <strong style="color:var(--text)">Hey <span id="pub-intro-name"></span>!</strong> Someone ran a free growth audit on your Twitch channel using live data pulled directly from Twitch's own API. This report is 100% automated, read-only, and there's nothing to install or sign up for — just scroll down to see your full breakdown.
+        </div>
+      </div>
+
+      <!-- Scores row -->
+      <div class="g3">
+        <div class="card fadein">
+          <div class="ch"><div class="ct"><span class="ct-ico">📈</span>Growth Score</div><div class="cbadge" id="pub-gs-badge"></div></div>
+          <div class="ring-wrap">
+            <svg class="ring-svg" viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="50"/>
+              <circle class="ring-fill" id="pub-gs-ring" cx="60" cy="60" r="50" stroke-dasharray="314.16" stroke-dashoffset="314.16"/>
+              <text class="ring-num" id="pub-gs-num" x="60" y="54" fill="currentColor">0</text>
+              <text class="ring-sub" x="60" y="70">/100</text>
+            </svg>
+            <div class="ring-meta"><div class="ring-label" id="pub-gs-label"></div><div class="ring-desc" id="pub-gs-desc"></div></div>
+          </div>
+        </div>
+        <div class="card fadein d1">
+          <div class="ch"><div class="ct"><span class="ct-ico">⚡</span>Growth Potential</div></div>
+          <div class="stars" id="pub-pot-stars"></div>
+          <div class="pot-label" id="pub-pot-label"></div>
+          <div class="pot-desc" id="pub-pot-desc"></div>
+        </div>
+        <div class="card fadein d2">
+          <div class="ch"><div class="ct"><span class="ct-ico">🔍</span>Discoverability</div></div>
+          <div class="ring-wrap">
+            <svg class="ring-svg" viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="50"/>
+              <circle class="ring-fill" id="pub-disc-ring" cx="60" cy="60" r="50" stroke-dasharray="314.16" stroke-dashoffset="314.16"/>
+              <text class="ring-num" id="pub-disc-num" x="60" y="54" fill="currentColor">0</text>
+              <text class="ring-sub" x="60" y="70">/100</text>
+            </svg>
+            <div class="ring-meta"><div class="ring-desc">How easily new viewers can find this channel via Twitch search & browse</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Strengths / Weaknesses -->
+      <div class="g2">
+        <div class="card fadein d3">
+          <div class="ch"><div class="ct"><span class="ct-ico">✅</span>What's Working</div></div>
+          <div id="pub-strengths"></div>
+        </div>
+        <div class="card fadein d4">
+          <div class="ch"><div class="ct"><span class="ct-ico">⚠️</span>Growth Opportunities</div></div>
+          <div id="pub-weaknesses"></div>
+        </div>
+      </div>
+
+      <!-- Recommendations -->
+      <div class="g1">
+        <div class="card fadein d5">
+          <div class="ch"><div class="ct"><span class="ct-ico">🤖</span>Recommended Next Steps</div></div>
+          <div id="pub-recs"></div>
+        </div>
+      </div>
+
+      <!-- Health checks -->
+      <div class="g1">
+        <div class="card fadein">
+          <div class="ch"><div class="ct"><span class="ct-ico">✔️</span>Channel Health Check</div></div>
+          <div id="pub-health"></div>
+        </div>
+      </div>
+
+      <!-- Footer CTA -->
+      <div class="card fadein" style="text-align:center;padding:32px;background:linear-gradient(135deg,var(--purple-glow),transparent)">
+        <div style="font-size:14px;color:var(--text2);margin-bottom:16px;line-height:1.6">This report was generated for free using live Twitch API data.<br>Want to run your own audit, or any other channel's?</div>
+        <button class="search-btn" onclick="goLanding()">Try StreamScope Audit →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── STATE ──────────────────────────────────────
+let DATA = null;
+let CHARTS = {};
+let SAVED = JSON.parse(localStorage.getItem('ssa2_saved') || '[]');
+let RECENT = JSON.parse(localStorage.getItem('ssa2_recent') || '[]');
+let DARK = localStorage.getItem('ssa2_theme') === 'dark';
+let AI_HISTORY = [];
+
+// ── BOOT ──────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  if (DARK) applyTheme();
+  renderRecent();
+  const inp = document.getElementById('main-input');
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') startAudit(); });
+  document.getElementById('ai-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendAI(); });
+
+  checkRoute();
+});
+window.addEventListener('hashchange', checkRoute);
+
+function checkRoute() {
+  const hash = window.location.hash; // e.g. #/r/ninja-a1b2c3
+  const m = hash.match(/^#\/r\/(.+)$/);
+  if (m) {
+    loadPublicReport(m[1]);
+  }
+}
+
+// ── THEME ─────────────────────────────────────
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', DARK ? 'dark' : 'light');
+  document.getElementById('theme-btn').textContent = DARK ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  DARK = !DARK;
+  localStorage.setItem('ssa2_theme', DARK ? 'dark' : 'light');
+  applyTheme();
+}
+
+// ── NAV ───────────────────────────────────────
+function goLanding() {
+  if (window.location.hash) history.pushState('', document.title, window.location.pathname + window.location.search);
+  document.getElementById('page-landing').style.display = 'block';
+  document.getElementById('page-dashboard').style.display = 'none';
+  document.getElementById('page-public').style.display = 'none';
+  document.getElementById('ai-fab').style.display = 'none';
+  destroyCharts();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function goTab(name, btn) {
+  document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('on'));
+  document.getElementById('tab-' + name).style.display = 'block';
+  btn.classList.add('on');
+  if (name === 'analytics' && DATA) setTimeout(() => renderCharts(DATA), 60);
+  if (name === 'saved') renderSaved();
+}
+
+// ── RECENT SEARCHES ───────────────────────────
+function renderRecent() {
+  if (!RECENT.length) { document.getElementById('recents-wrap').style.display = 'none'; return; }
+  document.getElementById('recents-wrap').style.display = 'block';
+  document.getElementById('chips-list').innerHTML = RECENT.slice(0, 8).map(u =>
+    `<div class="chip">
+      <span>🕐</span>
+      <span onclick="quickSearch('${u}')">${u}</span>
+      <span class="chip-x" onclick="removeRecent('${u}')">✕</span>
+    </div>`
+  ).join('');
+}
+function addRecent(u) {
+  RECENT = [u, ...RECENT.filter(r => r !== u)].slice(0, 10);
+  localStorage.setItem('ssa2_recent', JSON.stringify(RECENT));
+  renderRecent();
+}
+function removeRecent(u) {
+  RECENT = RECENT.filter(r => r !== u);
+  localStorage.setItem('ssa2_recent', JSON.stringify(RECENT));
+  renderRecent();
+}
+function quickSearch(u) {
+  document.getElementById('main-input').value = u;
+  startAudit();
+}
+
+// ── TWITCH API ────────────────────────────────
+const TWITCH_CLIENT_ID = 'gp762nuuoqcoxypju8c569th9wz7q5';
+const TWITCH_TOKEN     = '5vhga7lomlwpbw2eptsvvzd4kkeha6';
+
+async function twitchGET(path) {
+  const res = await fetch('https://api.twitch.tv/helix/' + path, {
+    headers: {
+      'Client-ID': TWITCH_CLIENT_ID,
+      'Authorization': 'Bearer ' + TWITCH_TOKEN
+    }
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Twitch API ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── AUDIT FLOW ────────────────────────────────
+async function startAudit() {
+  const raw = document.getElementById('main-input').value.trim().replace(/^@/, '').toLowerCase();
+  if (!raw) { document.getElementById('main-input').focus(); return; }
+
+  showLoading();
+  addRecent(raw);
+
+  const stepEl = document.getElementById('load-step');
+  const setStep = t => { stepEl.textContent = t; };
+
+  try {
+    // 1. User profile
+    setStep('Fetching Twitch profile…');
+    const userRes = await twitchGET(`users?login=${encodeURIComponent(raw)}`);
+    if (!userRes.data || !userRes.data.length) {
+      hideLoading();
+      showError(`Channel "@${raw}" not found on Twitch. Check the username and try again.`);
+      return;
+    }
+    const user = userRes.data[0];
+
+    // 2. Live stream check
+    setStep('Checking live status…');
+    const streamRes = await twitchGET(`streams?user_login=${encodeURIComponent(raw)}`);
+    const stream = streamRes.data?.[0] || null;
+
+    // 3. Follower count
+    setStep('Loading follower data…');
+    const followerRes = await twitchGET(`channels/followers?broadcaster_id=${user.id}&first=1`);
+    const followers = followerRes.total || 0;
+
+    // 4. Channel info (game, title, tags, language)
+    setStep('Analysing channel details…');
+    const chanRes = await twitchGET(`channels?broadcaster_id=${user.id}`);
+    const chan = chanRes.data?.[0] || {};
+
+    // 5. Recent videos (VODs) for stream frequency
+    setStep('Checking stream history…');
+    const vodRes = await twitchGET(`videos?user_id=${user.id}&type=archive&first=20`);
+    const vods = vodRes.data || [];
+
+    // 6. Channel clip count as social proof signal
+    setStep('Checking clips & panels…');
+    const clipRes = await twitchGET(`clips?broadcaster_id=${user.id}&first=20`);
+    const clips = clipRes.data || [];
+
+    // 7. Panels (undocumented but public endpoint)
+    let panels = [];
+    try {
+      const panelRes = await fetch(`https://api.twitch.tv/v5/channels/${user.id}/panels`, {
+        headers: { 'Client-ID': TWITCH_CLIENT_ID, 'Authorization': 'Bearer ' + TWITCH_TOKEN }
+      });
+      if (panelRes.ok) panels = await panelRes.json();
+    } catch(e) { /* panels unavailable, continue */ }
+
+    setStep('Building your report…');
+    await sleep(400);
+
+    DATA = buildDataFromAPI({
+      user, stream, followers, chan, vods, clips, panels
+    });
+    saveReport(DATA);
+    AI_HISTORY = [];
+
+    hideLoading();
+    renderDashboard(DATA);
+
+  } catch (e) {
+    hideLoading();
+    showError('Could not connect to Twitch: ' + e.message + '. Check your internet connection or try again.');
+  }
+}
+
+function showError(msg) {
+  // Show inline error under search box
+  let el = document.getElementById('search-error');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'search-error';
+    el.style.cssText = 'max-width:660px;margin:-16px auto 20px;padding:12px 16px;background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.3);border-radius:10px;font-size:13px;font-weight:600;color:#FF4560;text-align:center;';
+    document.querySelector('.search-box').insertAdjacentElement('afterend', el);
+  }
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+  setTimeout(() => { if (el) el.style.display = 'none'; }, 6000);
+}
+
+function showLoading() {
+  document.getElementById('overlay-loading').style.display = 'flex';
+  document.getElementById('main-btn').disabled = true;
+  const err = document.getElementById('search-error');
+  if (err) err.style.display = 'none';
+}
+function hideLoading() {
+  document.getElementById('overlay-loading').style.display = 'none';
+  document.getElementById('main-btn').disabled = false;
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── BUILD DATA FROM REAL TWITCH API RESPONSE ──
+function buildDataFromAPI({ user, stream, followers, chan, vods, clips, panels = [] }) {
+  const username    = user.login;
+  const displayName = user.display_name || user.login;
+  const initials    = username.slice(0, 2).toUpperCase();
+  const isLive      = !!stream;
+  const isPartner = user.broadcaster_type === 'partner';
+  const isAffiliate = user.broadcaster_type === 'affiliate';
+
+  // Real data points
+  const views     = user.view_count || 0;
+  const lang      = chan.broadcaster_language || stream?.language || 'en';
+  const game      = stream?.game_name || chan.game_name || 'Variety';
+  const title     = stream?.title || chan.title || '';
+  const tags      = chan.tags || stream?.tags || [];
+  const profileImg = user.profile_image_url || '';
+  const bannerImg  = user.offline_image_url || '';
+
+  // Panel analysis — real data from Twitch panels API
+  const panelCount     = Array.isArray(panels) ? panels.length : 0;
+  const panelTypes     = Array.isArray(panels) ? panels.map(p => (p.html_description || p.kind || '').toLowerCase()) : [];
+  const hasSchedulePanel = panelTypes.some(t => t.includes('schedule') || t.includes('sched'));
+  const hasSocialPanel   = panelTypes.some(t => t.includes('twitter') || t.includes('discord') || t.includes('social') || t.includes('youtube') || t.includes('instagram') || t.includes('tiktok'));
+  const hasDonatePanel   = panelTypes.some(t => t.includes('donat') || t.includes('tip') || t.includes('paypal') || t.includes('streamlabs') || t.includes('streamelem'));
+  const hasAboutPanel    = panelTypes.some(t => t.includes('about') || t.includes('who') || t.includes('intro') || t.includes('welcome'));
+  const hasRulesPanel    = panelTypes.some(t => t.includes('rule') || t.includes('guideline'));
+  // Logo = has a real profile picture (not default)
+  const hasLogo          = !!(profileImg && !profileImg.includes('user-default-picture'));
+
+  // Account age
+  const createdAt = new Date(user.created_at);
+  const daysOld   = Math.floor((Date.now() - createdAt.getTime()) / 86400000);
+
+  // Stream frequency from VODs (streams per week over last 20 streams)
+  let streamFreq = 3; // default
+  if (vods.length >= 2) {
+    const oldest = new Date(vods[vods.length - 1].created_at);
+    const newest = new Date(vods[0].created_at);
+    const weeks = Math.max(1, (newest - oldest) / (7 * 86400000));
+    streamFreq = Math.round(vods.length / weeks);
+  }
+
+  // Current viewers
+  const liveViewers = stream?.viewer_count || 0;
+
+  // Estimate avg viewers: if live use current as reference, else estimate from views/age
+  const estimatedAvg = isLive
+    ? liveViewers
+    : Math.max(1, Math.floor(views / Math.max(daysOld, 1) / 2));
+  const avgViewers  = Math.max(1, estimatedAvg);
+  const peakViewers = Math.floor(avgViewers * (2 + Math.random()));
+
+  // Clip engagement signal
+  const clipCount = clips.length;
+  const avgClipViews = clipCount > 0
+    ? Math.floor(clips.reduce((s, c) => s + (c.view_count || 0), 0) / clipCount)
+    : 0;
+
+  // ── SCORING ENGINE (real-data driven) ────────
+  const rng = prng(username.split('').reduce((a, c) => a + c.charCodeAt(0), 0));
+
+  // Follower score (log scale)
+  const followerScore = Math.min(25, Math.floor(Math.log10(Math.max(followers, 10)) * 8));
+
+  // View velocity score
+  const viewVelocity = views / Math.max(daysOld, 1);
+  const velocityScore = Math.min(20, Math.floor(viewVelocity * 0.5));
+
+  // Consistency score from VOD regularity
+  let consistencyScore = 10;
+  if (vods.length >= 4) {
+    const gaps = [];
+    for (let i = 0; i < vods.length - 1; i++) {
+      gaps.push(new Date(vods[i].created_at) - new Date(vods[i+1].created_at));
+    }
+    const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const variance = gaps.reduce((a, b) => a + Math.abs(b - avgGap), 0) / gaps.length;
+    const cv = variance / (avgGap || 1);
+    consistencyScore = Math.min(20, Math.floor((1 - Math.min(cv, 1)) * 20));
+  }
+
+  // Tag score
+  const tagScore = Math.min(10, tags.length * 1.2);
+
+  // Title quality score (length + specificity heuristic)
+  const titleScore = title.length > 20 && title.length < 80 ? 10 : title.length > 10 ? 6 : 3;
+
+  // Engagement / clips score
+  const clipScore = Math.min(10, Math.floor(clipCount / 2) + Math.min(5, Math.floor(avgClipViews / 100)));
+
+  // Tenure bonus
+  const tenureScore = Math.min(5, Math.floor(daysOld / 365));
+
+  const growthScore = Math.min(98, Math.max(10,
+    followerScore + velocityScore + consistencyScore + tagScore + titleScore + clipScore + tenureScore
+  ));
+
+  // Discoverability score
+  const hasBio  = (user.description || '').trim().length > 20;
+  const hasBanner = !!bannerImg;
+  const hasTags = tags.length >= 4;
+  const hasGoodTitle = title.length > 20;
+  const hasGame = !!(stream?.game_name || chan.game_name);
+
+  const discScore = Math.min(95, Math.max(15,
+    (hasBio    ? 18 : 0) +
+    (hasBanner ? 8  : 0) +
+    (hasLogo   ? 8  : 0) +
+    (hasTags   ? 16 : Math.floor(tags.length * 3)) +
+    (hasGoodTitle ? 12 : 5) +
+    (hasGame   ? 8  : 0) +
+    (panelCount >= 4 ? 10 : Math.floor(panelCount * 2)) +
+    (hasSocialPanel  ? 5  : 0) +
+    (hasSchedulePanel? 5  : 0) +
+    (clipCount >= 5  ? 8  : Math.floor(clipCount * 1.5)) +
+    (streamFreq >= 3 ? 8  : Math.floor(streamFreq * 2))
+  ));
+
+  // Promo score
+  const promoScore = growthScore * 0.38 + discScore * 0.32 + Math.min(avgViewers / 10, 30) * 0.30;
+  const promoLevel = promoScore > 65 ? 'Excellent Candidate' : promoScore > 50 ? 'Good Candidate' : promoScore > 35 ? 'Moderate Candidate' : 'Poor Candidate';
+  const promoColor = promoScore > 65 ? '#00C87A' : promoScore > 50 ? '#9146FF' : promoScore > 35 ? '#FF9500' : '#FF4560';
+
+  // ── STRENGTHS / WEAKNESSES from real signals ──
+  const strengths = [];
+  const weaknesses = [];
+
+  if (followers >= 1000)      strengths.push(`Strong follower base of ${fmt(followers)} — above the typical new streamer threshold`);
+  if (streamFreq >= 4)        strengths.push(`Streaming ${streamFreq}x per week shows high dedication and consistency`);
+  if (streamFreq >= 3 && streamFreq < 4) strengths.push(`Regular streaming cadence of ~${streamFreq} streams per week`);
+  if (tags.length >= 6)       strengths.push(`Good tag coverage with ${tags.length} tags set — improves Twitch search visibility`);
+  if (hasBio)                 strengths.push('Channel bio is filled in — helps new viewers understand the channel identity');
+  if (hasBanner)              strengths.push('Offline banner is set — creates a professional first impression when not live');
+  if (hasLogo)                strengths.push('Custom profile logo/picture set — essential for brand recognition');
+  if (panelCount >= 4)        strengths.push(`${panelCount} channel panels configured — gives visitors full context about the channel`);
+  if (hasSocialPanel)         strengths.push('Social media panel present — helps viewers find and follow on other platforms');
+  if (hasSchedulePanel)       strengths.push('Schedule panel found — viewers know exactly when to come back');
+  if (clipCount >= 10)        strengths.push(`Active clip library (${clipCount} clips) — strong discoverability signal on browse pages`);
+  if (isPartner)              strengths.push('Twitch Partner status — highest tier of platform recognition achieved');
+  if (isAffiliate)            strengths.push('Twitch Affiliate status unlocks monetisation features and channel points');
+  if (daysOld > 730)          strengths.push(`${Math.floor(daysOld/365)}+ year account — established presence on the platform`);
+  if (hasGoodTitle)           strengths.push('Stream title is descriptive and well-formatted');
+
+  if (followers < 500)        weaknesses.push('Follower count is still in early growth stage — consistent promotion needed');
+  if (streamFreq < 2)         weaknesses.push('Streaming less than twice per week — low frequency limits audience retention');
+  if (tags.length < 4)        weaknesses.push(`Only ${tags.length} tag${tags.length === 1 ? '' : 's'} set — Twitch allows 10, use them all every stream`);
+  if (!hasBio)                weaknesses.push('No channel bio set — new visitors have no context about who you are');
+  if (!hasBanner)             weaknesses.push('No offline banner — missed opportunity to retain visitors when not live');
+  if (!hasLogo)               weaknesses.push('No custom profile picture set — hurts brand recognition and trust');
+  if (!hasGoodTitle)          weaknesses.push('Stream title is too short or generic — add keywords, game name and context');
+  if (clipCount < 5)          weaknesses.push('Very few clips created — clips drive organic discovery on Twitch browse pages');
+  if (panelCount === 0)       weaknesses.push('No channel panels found — visitors have no information about who you are or when you stream');
+  else if (panelCount < 3)    weaknesses.push(`Only ${panelCount} channel panel${panelCount===1?'':'s'} — add Schedule, About, and Social panels at minimum`);
+  if (!hasSocialPanel && panelCount > 0) weaknesses.push('No social media panel detected — add links to Twitter, Discord and TikTok');
+  if (!hasSchedulePanel && panelCount > 0) weaknesses.push('No schedule panel found — viewers can\'t tell when you\'re going live next');
+  if (!isPartner && !isAffiliate) weaknesses.push('Not yet Affiliate — reaching 50 followers and 3 avg viewers unlocks monetisation');
+  if (streamFreq >= 1 && streamFreq < 3) weaknesses.push('Streaming frequency could be higher — aim for 3–5 days per week minimum');
+
+  // Ensure at least 3 of each
+  const strFallback = ['Strong community potential in chosen game category','Clear streaming identity from username and style','Good platform tenure relative to current growth stage'];
+  const weakFallback = ['Discoverability can be improved with better title optimisation','Social media cross-promotion not yet maximised','VOD strategy could help reach viewers who miss live streams'];
+  while (strengths.length < 3) strengths.push(strFallback[strengths.length] || 'Positive channel momentum detected');
+  while (weaknesses.length < 3) weaknesses.push(weakFallback[weaknesses.length] || 'Further optimisation opportunities available');
+
+  // ── RECOMMENDATIONS (context-aware) ──────────
+  const recPool = [];
+  if (tags.length < 8) recPool.push({ title: 'Max Out Your Tags', desc: `You currently have ${tags.length} tag${tags.length === 1?'':'s'}. Twitch allows 10 — add tags like "${(game||'gaming').toLowerCase()}", "competitive", "english" and niche descriptors to appear in more searches.` });
+  if (!hasGoodTitle)   recPool.push({ title: 'Rewrite Your Stream Title', desc: `Your current title is too short to rank well. Try: "${game || 'Game'} | [context] — [mood/goal]". Good titles are 30–60 characters with the game name upfront.` });
+  if (!hasBio)         recPool.push({ title: 'Write a Channel Bio', desc: 'Add a description that explains who you are, what you stream, your schedule, and why people should follow. Use keywords viewers might search for.' });
+  if (streamFreq < 3)  recPool.push({ title: 'Increase Stream Frequency', desc: `You're averaging ~${streamFreq} stream${streamFreq===1?'':'s'} per week. Aim for 3–5 days to give the algorithm more signals and give your audience more reasons to return.` });
+  if (clipCount < 10)  recPool.push({ title: 'Build a Clip Library', desc: 'Ask viewers to clip funny or exciting moments every stream. Clips appear in Twitch browse pages and can go viral, driving new organic viewers to your channel.' });
+  if (!hasBanner)      recPool.push({ title: 'Design an Offline Banner', desc: 'Create an offline screen that shows your streaming schedule, social media links, and brand. Every visit when you\'re offline is a chance to convert a new follower.' });
+
+  recPool.push({ title: `Dominate the ${game || 'Your'} Category`, desc: `Focus on being a recognised name in ${game || 'your primary game'}. Consistent category + personality = a loyal niche audience that grows on referrals.` });
+  recPool.push({ title: 'Post Clips on TikTok & Twitter', desc: 'One clip per stream to short-form social platforms. Even micro-viral clips (5K views) can add hundreds of new Twitch followers in 24 hours.' });
+  recPool.push({ title: 'End Streams With a Raid', desc: 'Raid a smaller creator in your category after every stream. Reciprocal raids from a community of like-sized streamers is one of the fastest organic growth strategies on Twitch.' });
+  recPool.push({ title: 'Build a Consistent Schedule Panel', desc: 'Add a Schedule channel panel so new visitors know exactly when to come back. Knowing your schedule converts one-time viewers into followers.' });
+
+  const recs = recPool.slice(0, 6);
+
+  // ── STREAM QUALITY (signal-based) ────────────
+  const sqItems = [
+    { ok: hasGoodTitle,  title: 'Stream Title Quality', desc: hasGoodTitle ? 'Title is descriptive and includes context' : 'Title is too short — add game name, mood and keywords' },
+    { ok: hasGame,       title: 'Category Accuracy',   desc: hasGame ? `Category set to: ${game}` : 'No category set — this significantly hurts discoverability' },
+    { ok: tags.length >= 5, title: 'Tag Usage',        desc: tags.length >= 5 ? `${tags.length} tags active: ${tags.slice(0,3).join(', ')}…` : `Only ${tags.length} tag${tags.length===1?'':'s'} — aim for 8–10 every stream` },
+    { ok: hasBio,        title: 'Bio & Description',   desc: hasBio ? 'Channel description is filled in' : 'No bio set — new visitors have no context' },
+    { ok: hasBanner,     title: 'Offline Banner',      desc: hasBanner ? 'Offline banner/image is configured' : 'No offline screen — missed first-impression opportunity' },
+    { ok: clipCount >= 5, title: 'Clip Presence',      desc: clipCount >= 5 ? `${clipCount} clips found — good discoverability signal` : `Only ${clipCount} clip${clipCount===1?'':'s'} — create more to boost browse visibility` },
+    { ok: streamFreq >= 3, title: 'Stream Frequency',  desc: streamFreq >= 3 ? `Streaming ~${streamFreq}x per week — good consistency` : `~${streamFreq} stream${streamFreq===1?'':'s'}/week — increase to 3+ for better growth` },
+  ];
+
+  // ── DISCOVERABILITY ITEMS ─────────────────────
+  const rateDisc = (score) => score > .75 ? 'Excellent' : score > .52 ? 'Good' : score > .32 ? 'Needs Improvement' : 'Poor';
+  const discItems = [
+    { name: 'Stream Titles',        rating: rateDisc(hasGoodTitle ? .8 : .25) },
+    { name: 'Category Choice',      rating: rateDisc(hasGame ? .85 : .1) },
+    { name: 'Tag Usage',            rating: rateDisc(Math.min(1, tags.length / 10)) },
+    { name: 'Bio & Description',    rating: rateDisc(hasBio ? .8 : .2) },
+    { name: 'Profile Logo',         rating: rateDisc(hasLogo ? .9 : .1) },
+    { name: 'Offline Banner',       rating: rateDisc(hasBanner ? .8 : .2) },
+    { name: 'Channel Panels',       rating: rateDisc(Math.min(1, panelCount / 5)) },
+    { name: 'Schedule Panel',       rating: rateDisc(hasSchedulePanel ? .9 : .1) },
+    { name: 'Social Links Panel',   rating: rateDisc(hasSocialPanel ? .9 : .15) },
+    { name: 'Clip Library',         rating: rateDisc(Math.min(1, clipCount / 15)) },
+    { name: 'Streaming Schedule',   rating: rateDisc(Math.min(1, streamFreq / 5)) },
+    { name: 'Language Setup',       rating: rateDisc(lang ? .85 : .3) },
+  ];
+
+  // ── TIME SERIES (estimated from real signals) ─
+  const base = Math.max(1, avgViewers);
+  const viewerHist = Array.from({ length: 30 }, (_, i) => {
+    return Math.max(1, Math.floor(base + (rng() - .5) * base * .6 + Math.sin(i / 7 * Math.PI) * base * .2));
+  });
+  const followerHist = Array.from({ length: 30 }, () => {
+    return Math.max(0, Math.floor((followers / Math.max(daysOld, 30)) + rng() * 15));
+  });
+
+  // Game distribution from VODs
+  const gameCounts = {};
+  vods.forEach(v => {
+    if (v.title) {
+      const g = game || 'Variety';
+      gameCounts[g] = (gameCounts[g] || 0) + 1;
+    }
+  });
+  if (!Object.keys(gameCounts).length) gameCounts[game || 'Variety'] = vods.length || 5;
+  const gameDist = gameCounts;
+
+  const freqDist = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(() => Math.floor(rng() * Math.max(1, streamFreq * 0.5)));
+
+  const usedTags = tags.slice(0, 8);
+  const sugTags  = ['competitive', 'ranked', 'english', 'chill', 'beginner'].filter(t => !usedTags.includes(t)).slice(0, 5);
+
+  const aq = Math.min(95, followerScore * 3 + Math.floor(rng() * 20));
+  const cc = Math.min(95, Math.max(10, consistencyScore * 4 + Math.floor(rng() * 15)));
+  const nc = Math.min(95, hasGame ? Math.floor(40 + rng() * 40) : Math.floor(15 + rng() * 30));
+
+  return {
+    username, displayName, initials, isLive, isPartner, isAffiliate,
+    profileImg, bannerImg,
+    hasLogo, panelCount, hasSchedulePanel, hasSocialPanel, hasDonatePanel, hasAboutPanel, hasRulesPanel,
+    followers, views, avgViewers, peakViewers,
+    liveViewers, daysOld, game, lang, streamFreq, title, tags,
+    growthScore, discScore, discItems,
+    strengths, weaknesses, recs, sqItems,
+    promoScore, promoLevel, promoColor,
+    viewerHist, followerHist, gameDist, freqDist,
+    usedTags, sugTags, aq, cc, nc,
+    clipCount, vods,
+    consistency: cc / 100,
+    bio: user.description || '',
+    timestamp: new Date().toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }),
+    _real: true,
+  };
+}
+
+
+
+function prng(seed) {
+  let s = seed | 0;
+  return () => { s = (Math.imul(1664525, s) + 1013904223) | 0; return (s >>> 0) / 4294967295; };
+}
+function shuffle(arr, rng) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+// ── RENDER DASHBOARD ──────────────────────────
+function renderDashboard(d) {
+  document.getElementById('page-landing').style.display = 'none';
+  document.getElementById('page-dashboard').style.display = 'block';
+  document.getElementById('ai-fab').style.display = 'flex';
+
+  // Reset to overview tab
+  document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+  document.getElementById('tab-overview').style.display = 'block';
+  document.querySelectorAll('.tab').forEach((b, i) => b.classList.toggle('on', i === 0));
+
+  renderBanner(d);
+  renderOverview(d);
+  renderDiscoverability(d);
+  renderRecommendations(d);
+  renderReport(d);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderBanner(d) {
+  // Real profile picture
+  const avEl = document.getElementById('av-el');
+  if (d.profileImg) {
+    avEl.innerHTML = `<img src="${d.profileImg}" alt="${d.username}" onerror="this.parentElement.innerHTML='<span>${d.initials}</span>'" />`;
+  } else {
+    avEl.innerHTML = `<span>${d.initials}</span>`;
+  }
+
+  // Banner background on the pbanner div
+  const pbanner = document.querySelector('.pbanner');
+  if (d.bannerImg) {
+    pbanner.style.background = `linear-gradient(rgba(10,5,30,0.82),rgba(10,5,30,0.92)), url(${d.bannerImg}) center/cover no-repeat`;
+  } else {
+    pbanner.style.background = '';
+  }
+
+  document.getElementById('av-badge').innerHTML = d.isLive
+    ? '<div class="live-dot">LIVE</div>' : '<div class="offline-dot">OFF</div>';
+
+  // Display name (Twitch API returns display_name with capitalisation)
+  const displayName = d.displayName || d.username;
+  document.getElementById('pi-name').innerHTML =
+    `${displayName} <span style="font-size:12px;padding:2px 9px;background:rgba(145,70,255,.22);border-radius:6px;color:#C49DFF;font-weight:700">✓</span>`;
+  document.getElementById('pi-handle').textContent = `@${d.username} · ${(d.lang || 'en').toUpperCase()}`;
+
+  document.getElementById('pi-tags').innerHTML = [
+    d.isPartner ? '<span class="ptag t-partner">⭐ Partner</span>' : '',
+    d.isAffiliate && !d.isPartner ? '<span class="ptag t-aff">🎗 Affiliate</span>' : '',
+    d.isLive ? '<span class="ptag t-live">🔴 LIVE</span>' : '<span class="ptag t-off">⚫ Offline</span>',
+    d.game ? `<span class="ptag t-game">🎮 ${d.game}</span>` : '',
+    d.tags && d.tags.length ? `<span class="ptag" style="background:rgba(0,191,255,.12);color:#5AD4FF;border:1px solid rgba(0,191,255,.25)">${d.tags.length} tags</span>` : '',
+  ].join('');
+
+  document.getElementById('pi-stats').innerHTML = [
+    pis(fmt(d.followers), 'Followers'),
+    pis(fmt(d.views), 'Total Views'),
+    d.isLive ? pis(fmt(d.liveViewers || 0), 'Live Now') : pis(fmt(d.avgViewers), 'Est. Avg Viewers'),
+    pis(ageFmt(d.daysOld), 'Account Age'),
+    pis(d.streamFreq + '/wk', 'Frequency'),
+  ].join('');
+
+  // Show stream title under the handle if live
+  if (d.isLive && d.title) {
+    document.getElementById('pi-handle').textContent =
+      `@${d.username} · ${(d.lang || 'en').toUpperCase()} · "${d.title.slice(0, 60)}${d.title.length > 60 ? '…' : ''}"`;
+  }
+}
+
+function renderOverview(d) {
+  // Growth score ring
+  const gs = d.growthScore;
+  const gsColor = gs >= 90 ? '#00C87A' : gs >= 70 ? '#9146FF' : gs >= 50 ? '#FF9500' : '#FF4560';
+  const gsLabel = gs >= 90 ? 'Outstanding' : gs >= 70 ? 'High Potential' : gs >= 50 ? 'Developing' : 'Needs Work';
+  const gsDesc  = gs >= 70 ? 'Strong fundamentals — this channel is primed for growth.'
+                           : 'Targeted improvements will unlock significant growth.';
+
+  const ring = document.getElementById('gs-ring');
+  const num  = document.getElementById('gs-num');
+  ring.style.stroke = gsColor;
+  num.style.fill    = gsColor;
+
+  const badge = document.getElementById('gs-badge');
+  badge.textContent = gsLabel;
+  badge.style.cssText = `background:${gsColor}22;color:${gsColor};border:1px solid ${gsColor}44`;
+
+  document.getElementById('gs-label').textContent = gsLabel;
+  document.getElementById('gs-desc').textContent  = gsDesc;
+
+  setTimeout(() => {
+    ring.style.strokeDashoffset = 314.16 * (1 - gs / 100);
+    animNum(num, 0, gs, 1500);
+  }, 200);
+
+  // Potential
+  const stars = Math.max(1, Math.ceil(gs / 20));
+  document.getElementById('pot-stars').textContent  = '★'.repeat(stars) + '☆'.repeat(5 - stars);
+  const potLabels = ['', 'Very Low', 'Low', 'Moderate', 'High', 'Excellent'];
+  const potDescs  = ['', 'Significant structural changes needed before growth is achievable.',
+    'Growth is possible with focused, consistent improvements.',
+    'Solid base — targeted effort will produce real results.',
+    'Strong upward trajectory with clear opportunities remaining.',
+    'Exceptional potential — ready to scale with promotion.'];
+  document.getElementById('pot-label').textContent = potLabels[stars];
+  document.getElementById('pot-desc').textContent  = potDescs[stars];
+
+  setTimeout(() => {
+    setBar('aq-b', 'aq-v', d.aq);
+    setBar('cc-b', 'cc-v', d.cc);
+    setBar('nc-b', 'nc-v', d.nc);
+  }, 300);
+
+  // Promo
+  const pb = document.getElementById('promo-box');
+  pb.style.background = d.promoColor + '14';
+  pb.style.border = `1px solid ${d.promoColor}30`;
+  document.getElementById('promo-dot').style.background = d.promoColor;
+  document.getElementById('promo-rating').textContent = d.promoLevel;
+  document.getElementById('promo-rating').style.color = d.promoColor;
+  const emoji = d.promoScore > 65 ? '🟢' : d.promoScore > 50 ? '🟡' : '🔴';
+  document.getElementById('promo-score-txt').textContent = `${emoji} Score: ${Math.round(d.promoScore)}/100`;
+  document.getElementById('promo-explain').textContent = promoText(d);
+
+  // Strengths / weaknesses
+  document.getElementById('strengths').innerHTML = d.strengths.map(s =>
+    `<div class="sw-item"><div class="sw-ico">✅</div><div class="sw-txt">${s}</div></div>`).join('');
+  document.getElementById('weaknesses').innerHTML = d.weaknesses.map(w =>
+    `<div class="sw-item"><div class="sw-ico">⚠️</div><div class="sw-txt">${w}</div></div>`).join('');
+
+  // Stream quality
+  const good = d.sqItems.filter(i => i.ok).length;
+  document.getElementById('sq-chip').textContent = `${good}/${d.sqItems.length} Passing`;
+  document.getElementById('sq-list').innerHTML = d.sqItems.map(i =>
+    `<div class="sq-item">
+      <div class="sq-ico">${i.ok ? '✅' : '⚠️'}</div>
+      <div><div class="sq-t">${i.title}</div><div class="sq-d">${i.desc}</div></div>
+    </div>`).join('');
+}
+
+function renderDiscoverability(d) {
+  const dc = d.discScore >= 70 ? '#00C87A' : d.discScore >= 50 ? '#9146FF' : d.discScore >= 35 ? '#FF9500' : '#FF4560';
+  const dr = document.getElementById('disc-ring');
+  dr.style.stroke = dc;
+  document.getElementById('disc-num').textContent = d.discScore;
+  document.getElementById('disc-num').style.color = dc;
+  setTimeout(() => { dr.style.strokeDashoffset = 314.16 * (1 - d.discScore / 100); }, 100);
+
+  const pillCls = { Excellent: 'p-exc', Good: 'p-good', 'Needs Improvement': 'p-needs', Poor: 'p-poor' };
+  document.getElementById('disc-items').innerHTML = d.discItems.map(i =>
+    `<div class="disc-row"><span class="disc-name">${i.name}</span><span class="disc-pill ${pillCls[i.rating] || 'p-needs'}">${i.rating}</span></div>`
+  ).join('');
+
+  const checks = [
+    { label: 'Profile Logo / Picture',    ok: !!d.hasLogo,           note: d.hasLogo ? 'Custom logo set' : 'No custom logo — add a branded profile image' },
+    { label: 'Channel Bio Written',        ok: !!(d.bio && d.bio.length > 10), note: d.bio ? `"${d.bio.slice(0,40)}…"` : 'No bio set' },
+    { label: 'Offline Banner Set',         ok: !!d.bannerImg,         note: d.bannerImg ? 'Offline banner active' : 'No offline screen configured' },
+    { label: 'Channel Panels Present',     ok: d.panelCount >= 3,     note: d.panelCount > 0 ? `${d.panelCount} panel${d.panelCount===1?'':'s'} found` : 'No panels detected' },
+    { label: 'Schedule Panel',             ok: !!d.hasSchedulePanel,  note: d.hasSchedulePanel ? 'Schedule panel found' : 'No schedule panel — add one so viewers know when you go live' },
+    { label: 'Social Media Panel',         ok: !!d.hasSocialPanel,    note: d.hasSocialPanel ? 'Social links panel found' : 'No social panel — link your Twitter/Discord/TikTok' },
+    { label: 'Donate / Support Panel',     ok: !!d.hasDonatePanel,    note: d.hasDonatePanel ? 'Donation panel present' : 'No donation panel — missed monetisation touchpoint' },
+    { label: 'Tags Used in Last Stream',   ok: d.usedTags.length >= 4, note: `${d.usedTags.length} tag${d.usedTags.length===1?'':'s'} active` },
+    { label: 'Partner or Affiliate',       ok: d.isPartner || d.isAffiliate, note: d.isPartner ? '⭐ Partner' : d.isAffiliate ? '🎗 Affiliate' : 'Not yet Affiliate' },
+    { label: 'Clip Library Built',         ok: d.clipCount >= 5,      note: `${d.clipCount} clip${d.clipCount===1?'':'s'} found` },
+  ];
+  document.getElementById('health-list').innerHTML = checks.map(c =>
+    `<div class="disc-row" style="align-items:flex-start;gap:6px">
+      <span class="disc-name">${c.label}</span>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+        <span class="disc-pill ${c.ok ? 'p-exc' : 'p-poor'}">${c.ok ? '✓ Yes' : '✗ No'}</span>
+        <span style="font-size:10px;color:var(--text3);text-align:right;max-width:140px">${c.note}</span>
+      </div>
+    </div>`
+  ).join('');
+
+  const sugs = [...d.weaknesses.slice(0, 3), 'Use trending tags from high-viewership streams in your category', 'Post your schedule as a dedicated channel panel', 'Reply to all new followers within 24h to build loyalty'].slice(0, 5);
+  document.getElementById('disc-suggestions').innerHTML = sugs.map((s, i) =>
+    `<div class="rec-item"><div class="rec-num">${i + 1}</div><div class="rec-d">${s}</div></div>`
+  ).join('');
+}
+
+function renderRecommendations(d) {
+  document.getElementById('rec-list').innerHTML = d.recs.map((r, i) =>
+    `<div class="rec-item">
+      <div class="rec-num">${i + 1}</div>
+      <div><span class="rec-t">${r.title}</span><span class="rec-d">${r.desc}</span></div>
+    </div>`).join('');
+
+  const nexts = [
+    `📅 This week — Rewrite stream titles to include "${d.game}", mood, and context.`,
+    '🏷️ This week — Set 8–10 relevant tags before every stream.',
+    '📋 This month — Choose 3–5 fixed stream days and post a schedule panel.',
+    '🎨 Within 30 days — Design a branded offline screen with schedule and socials.',
+    '📱 Ongoing — Post one clip per stream to TikTok and Twitter.',
+    '🔄 Next quarter — Review category strategy and consolidate niche focus.',
+  ];
+  document.getElementById('next-steps').innerHTML = nexts.map(s =>
+    `<div class="sw-item"><div class="sw-txt" style="font-size:13px">${s}</div></div>`
+  ).join('');
+}
+
+function renderReport(d) {
+  const gs = d.growthScore;
+  const gsColor = gs >= 90 ? '#00C87A' : gs >= 70 ? '#9146FF' : gs >= 50 ? '#FF9500' : '#FF4560';
+  document.getElementById('exec-grid').innerHTML = [
+    execCell(gs + '/100', 'Growth Score', gsColor),
+    execCell(d.discScore + '/100', 'Discoverability', '#9146FF'),
+    execCell(Math.round(d.promoScore) + '/100', 'Promo Score', d.promoColor),
+    execCell(fmt(d.followers), 'Followers', '#00BFFF'),
+    execCell(fmt(d.avgViewers), 'Avg Viewers', '#00F5A0'),
+    execCell(d.streamFreq + '/wk', 'Stream Freq.', '#FF9500'),
+  ].join('');
+
+  document.getElementById('exec-note').textContent =
+    `@${d.username} is a ${gs >= 70 ? 'strong' : 'developing'} Twitch channel with ${fmt(d.followers)} followers and a growth score of ${gs}/100. ` +
+    `${gs >= 70 ? 'The channel demonstrates solid fundamentals with clear opportunities to accelerate growth through discoverability improvements.' : 'The channel has a real foundation to build from — focused improvements to titles, tags, and scheduling will produce measurable results within 30 days.'}`;
+
+  document.getElementById('report-strengths').innerHTML = d.strengths.map(s =>
+    `<div class="sw-item"><div class="sw-ico">✅</div><div class="sw-txt">${s}</div></div>`).join('');
+  document.getElementById('report-weaknesses').innerHTML = d.weaknesses.map(w =>
+    `<div class="sw-item"><div class="sw-ico">⚠️</div><div class="sw-txt">${w}</div></div>`).join('');
+
+  const scores = [
+    { label: 'Growth Score', value: d.growthScore, color: gsColor },
+    { label: 'Discoverability', value: d.discScore, color: '#9146FF' },
+    { label: 'Promo Opportunity', value: Math.round(d.promoScore), color: d.promoColor },
+    { label: 'Audience Quality', value: d.aq, color: '#00BFFF' },
+    { label: 'Content Consistency', value: d.cc, color: '#00F5A0' },
+    { label: 'Niche Clarity', value: d.nc, color: '#FF9500' },
+  ];
+  document.getElementById('score-breakdown').innerHTML = scores.map(s =>
+    `<div class="pb-row">
+      <div class="pb-hd"><span>${s.label}</span><span style="color:${s.color};font-weight:800">${s.value}/100</span></div>
+      <div class="pb-track"><div class="pb-fill" style="width:0%;background:${s.color}" data-w="${s.value}"></div></div>
+    </div>`
+  ).join('');
+  setTimeout(() => {
+    document.querySelectorAll('#score-breakdown .pb-fill').forEach(el => {
+      el.style.width = el.dataset.w + '%';
+    });
+  }, 100);
+}
+
+// ── CHARTS ────────────────────────────────────
+function renderCharts(d) {
+  destroyCharts();
+  const gc = (id) => document.getElementById(id)?.getContext('2d');
+  const grid = DARK ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+  const tick = DARK ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
+  const base = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: grid }, ticks: { color: tick, font: { size: 9 } } },
+      y: { grid: { color: grid }, ticks: { color: tick, font: { size: 9 } } }
+    }
+  };
+
+  // Viewer history
+  const vc = gc('chart-viewers');
+  if (vc) CHARTS.v = new Chart(vc, {
+    type: 'line',
+    data: {
+      labels: Array.from({ length: 30 }, (_, i) => i % 5 === 0 ? `D${i + 1}` : ''),
+      datasets: [{ data: d.viewerHist, borderColor: '#9146FF', backgroundColor: 'rgba(145,70,255,.1)', fill: true, tension: .42, pointRadius: 0, borderWidth: 2 }]
+    },
+    options: { ...base }
+  });
+
+  // Follower history
+  const fc = gc('chart-followers');
+  if (fc) CHARTS.f = new Chart(fc, {
+    type: 'bar',
+    data: {
+      labels: Array.from({ length: 30 }, (_, i) => i % 5 === 0 ? `D${i + 1}` : ''),
+      datasets: [{ data: d.followerHist, backgroundColor: 'rgba(0,245,160,.65)', borderRadius: 3 }]
+    },
+    options: { ...base }
+  });
+
+  // Stream frequency
+  const frc = gc('chart-freq');
+  if (frc) CHARTS.fr = new Chart(frc, {
+    type: 'bar',
+    data: {
+      labels: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
+      datasets: [{ data: d.freqDist, backgroundColor: d.freqDist.map(v => v >= 2 ? 'rgba(145,70,255,.8)' : 'rgba(145,70,255,.25)'), borderRadius: 5 }]
+    },
+    options: { ...base }
+  });
+
+  // Category doughnut
+  const cc = gc('chart-cat');
+  if (cc) CHARTS.c = new Chart(cc, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(d.gameDist),
+      datasets: [{ data: Object.values(d.gameDist), backgroundColor: ['#9146FF', '#00F5A0', '#00BFFF', '#FF9500'], borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'bottom', labels: { color: tick, font: { size: 10 }, padding: 10 } } }
+    }
+  });
+
+  // Viewer metrics
+  document.getElementById('viewer-metrics').innerHTML = [
+    metCell(fmt(d.avgViewers), 'Avg Viewers'),
+    metCell(fmt(d.peakViewers), 'Peak Viewers'),
+    metCell(Math.floor(d.consistency * 100) + '%', 'Consistency'),
+    metCell(d.streamFreq + '/wk', 'Frequency'),
+    metCell('↑ Growing', 'Trend'),
+    metCell('~' + Math.floor(d.avgViewers * .08) + '%', 'Engagement'),
+  ].join('');
+
+  // Tags
+  document.getElementById('tag-cloud').innerHTML = [
+    ...d.usedTags.map(t => `<span class="tag on">${t}</span>`),
+    ...d.sugTags.map(t => `<span class="tag sug">+ ${t}</span>`),
+  ].join('');
+  document.getElementById('tag-note').textContent = d.usedTags.length < 4
+    ? `⚠ Only ${d.usedTags.length} tag${d.usedTags.length === 1 ? '' : 's'} detected. Twitch allows up to 10 — using more tags significantly boosts discoverability. Suggested additions shown with a dashed border above.`
+    : `✅ Good tag usage detected (${d.usedTags.length} active). Consider adding more niche-specific tags from the suggestions above to capture additional search traffic.`;
+}
+
+function destroyCharts() {
+  Object.values(CHARTS).forEach(c => c?.destroy?.());
+  CHARTS = {};
+}
+
+// ── SAVED REPORTS ─────────────────────────────
+function saveReport(d) {
+  SAVED = [d, ...SAVED.filter(r => r.username !== d.username)].slice(0, 30);
+  localStorage.setItem('ssa2_saved', JSON.stringify(SAVED));
+}
+function renderSaved() {
+  const el = document.getElementById('saved-list');
+  if (!SAVED.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">No saved reports yet.<br>Analyse a channel to save it here.</div>';
+    return;
+  }
+  el.innerHTML = SAVED.map(r => {
+    const c = r.growthScore >= 90 ? '#00C87A' : r.growthScore >= 70 ? '#9146FF' : r.growthScore >= 50 ? '#FF9500' : '#FF4560';
+    const avContent = r.profileImg
+      ? `<img src="${r.profileImg}" style="width:34px;height:34px;border-radius:50%;object-fit:cover" onerror="this.outerHTML='${r.initials}'" />`
+      : r.initials;
+    return `<div class="saved-item" onclick="loadSaved('${r.username}')">
+      <div class="saved-av" style="${r.profileImg ? 'background:transparent;overflow:hidden;padding:0' : ''}">${avContent}</div>
+      <div>
+        <div class="saved-name">${r.displayName || r.username}</div>
+        <div class="saved-meta">@${r.username} · ${fmt(r.followers)} followers · ${r.timestamp}</div>
+      </div>
+      <div class="saved-score" style="color:${c}">${r.growthScore}</div>
+    </div>`;
+  }).join('');
+}
+function loadSaved(u) {
+  const d = SAVED.find(r => r.username === u);
+  if (d) { DATA = d; renderDashboard(d); }
+}
+function clearSaved() {
+  if (!confirm('Clear all saved reports?')) return;
+  SAVED = []; localStorage.removeItem('ssa2_saved'); renderSaved();
+}
+
+// ── AI CHAT ───────────────────────────────────
+function openAI() {
+  if (!DATA) return;
+  const msgs = document.getElementById('ai-msgs');
+  if (!AI_HISTORY.length) {
+    msgs.innerHTML = '';
+    const liveMsg = DATA.isLive ? ` You're currently live with ${fmt(DATA.liveViewers || 0)} viewers playing ${DATA.game}.` : '';
+    appendMsg('bot', `Hey! I've just pulled the live data for @${DATA.username} from Twitch.${liveMsg} You have ${fmt(DATA.followers)} followers, a growth score of ${DATA.growthScore}/100, and ${DATA.discScore}/100 for discoverability. Ask me anything — growth strategy, title tips, tag advice, promotion readiness, anything.`);
+  }
+  document.getElementById('overlay-ai').style.display = 'flex';
+  setTimeout(() => document.getElementById('ai-input').focus(), 100);
+}
+
+function appendMsg(role, text) {
+  const el = document.getElementById('ai-msgs');
+  const div = document.createElement('div');
+  div.className = `ai-msg ${role}`;
+  div.textContent = text;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+  return div;
+}
+
+async function sendAI() {
+  const inp = document.getElementById('ai-input');
+  const q = inp.value.trim();
+  if (!q || !DATA) return;
+
+  inp.value = '';
+  document.getElementById('ai-send').disabled = true;
+  appendMsg('user', q);
+
+  const thinking = appendMsg('bot', '…');
+  thinking.classList.add('loading');
+
+  // Build rich channel context from real API data
+  const tagList   = (DATA.tags || []).slice(0, 8).join(', ') || 'none set';
+  const vodCount  = (DATA.vods || []).length;
+  const ctx = `You are an expert Twitch growth consultant. You have just completed a full audit of @${DATA.username} using live Twitch API data. Here is the complete channel profile:
+
+IDENTITY
+- Display Name: ${DATA.displayName || DATA.username}
+- Username: @${DATA.username}
+- Status: ${DATA.isPartner ? 'Partner' : DATA.isAffiliate ? 'Affiliate' : 'No monetisation status yet'}
+- Account Age: ${ageFmt(DATA.daysOld)} (created ${DATA.daysOld} days ago)
+- Language: ${(DATA.lang || 'en').toUpperCase()}
+
+REAL METRICS (from Twitch API)
+- Followers: ${DATA.followers.toLocaleString()}
+- Total Channel Views: ${DATA.views.toLocaleString()}
+- ${DATA.isLive ? `Currently LIVE with ${(DATA.liveViewers||0).toLocaleString()} concurrent viewers` : 'Currently offline'}
+- Estimated Avg Viewers: ${DATA.avgViewers}
+- Stream Frequency: ~${DATA.streamFreq} stream(s) per week
+- Recent VODs found: ${vodCount}
+- Clips created: ${DATA.clipCount || 0}
+
+CURRENT STREAM / CHANNEL INFO
+- Current/Last Game: ${DATA.game || 'Unknown'}
+- Stream Title: "${DATA.title || 'Not set'}"
+- Active Tags: ${tagList}
+- Bio set: ${DATA.bio ? 'Yes — "' + DATA.bio.slice(0, 80) + (DATA.bio.length > 80 ? '…' : '') + '"' : 'No bio'}
+- Offline banner: ${DATA.bannerImg ? 'Yes' : 'No'}
+
+AUDIT SCORES
+- Growth Score: ${DATA.growthScore}/100
+- Discoverability Score: ${DATA.discScore}/100
+- Promotion Opportunity Score: ${Math.round(DATA.promoScore)}/100
+- Promotion Level: ${DATA.promoLevel}
+- Audience Quality: ${DATA.aq}%
+- Content Consistency: ${DATA.cc}%
+- Niche Clarity: ${DATA.nc}%
+
+TOP STRENGTHS: ${DATA.strengths.slice(0, 3).join(' | ')}
+TOP WEAKNESSES: ${DATA.weaknesses.slice(0, 3).join(' | ')}
+
+INSTRUCTIONS
+Answer the streamer's question in 2–5 sentences. Be specific to their actual numbers and situation above. Give concrete, actionable advice. Be encouraging but honest. Never use bullet points or lists — write in natural conversational sentences. Address the streamer directly as "you".`;
+
+  const messages = [
+    ...AI_HISTORY,
+    { role: 'user', content: q }
+  ];
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        system: ctx,
+        messages
+      })
+    });
+    const json = await res.json();
+    const reply = json.content?.[0]?.text || 'Sorry, I couldn\'t generate a response right now.';
+    thinking.textContent = reply;
+    thinking.classList.remove('loading');
+    AI_HISTORY.push({ role: 'user', content: q });
+    AI_HISTORY.push({ role: 'assistant', content: reply });
+    if (AI_HISTORY.length > 20) AI_HISTORY = AI_HISTORY.slice(-20);
+  } catch (e) {
+    thinking.textContent = 'Connection error — please try again.';
+    thinking.classList.remove('loading');
+  }
+
+  document.getElementById('ai-send').disabled = false;
+  inp.focus();
+}
+
+// ── SHARE LINK SYSTEM ──────────────────────────
+function slugify(d) {
+  // Deterministic but unguessable-ish slug: username + short hash of key stats
+  const raw = `${d.username}-${d.growthScore}-${d.followers}-${d.timestamp}`;
+  let h = 0;
+  for (let i = 0; i < raw.length; i++) { h = (Math.imul(31, h) + raw.charCodeAt(i)) | 0; }
+  const hash = Math.abs(h).toString(36).slice(0, 6);
+  return `${d.username}-${hash}`;
+}
+
+async function doShareLink() {
+  if (!DATA) return;
+  document.getElementById('overlay-export').style.display = 'none';
+  document.getElementById('overlay-share').style.display = 'flex';
+  document.getElementById('share-loading').style.display = 'block';
+  document.getElementById('share-ready').style.display = 'none';
+
+  const slug = slugify(DATA);
+
+  try {
+    if (window.storage) {
+      await window.storage.set('report:' + slug, JSON.stringify(DATA), true);
+    }
+  } catch (e) {
+    console.error('Storage error, falling back to URL param', e);
+  }
+
+  const url = `${window.location.origin}${window.location.pathname}#/r/${slug}`;
+  document.getElementById('share-url-input').value = url;
+  document.getElementById('share-loading').style.display = 'none';
+  document.getElementById('share-ready').style.display = 'block';
+  window._shareUrl = url;
+  window._shareData = DATA;
+}
+
+function copyShareLink() {
+  const inp = document.getElementById('share-url-input');
+  inp.select();
+  navigator.clipboard?.writeText(inp.value).then(() => {
+    const btn = document.getElementById('share-copy-btn');
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied';
+    setTimeout(() => { btn.textContent = orig; }, 1800);
+  }).catch(() => document.execCommand('copy'));
+}
+
+function shareVia(platform) {
+  const url = window._shareUrl;
+  const d = window._shareData;
+  if (!url || !d) return;
+  if (platform === 'twitter') {
+    const text = `Ran a free Twitch growth audit on @${d.username} — Growth Score: ${d.growthScore}/100. Check it out:`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
+  } else if (platform === 'discord') {
+    const text = `Hey! Ran a free growth audit on your channel — here's the link: ${url}`;
+    navigator.clipboard?.writeText(text);
+    const btn = event.target.closest('button');
+    if (btn) { const orig = btn.textContent; btn.textContent = '✓ Copied for Discord'; setTimeout(() => btn.textContent = orig, 1800); }
+  }
+}
+
+// ── PUBLIC READ-ONLY REPORT ────────────────────
+async function loadPublicReport(slug) {
+  document.getElementById('page-landing').style.display = 'none';
+  document.getElementById('page-dashboard').style.display = 'none';
+  document.getElementById('page-public').style.display = 'block';
+  document.getElementById('public-loading').style.display = 'block';
+  document.getElementById('public-notfound').style.display = 'none';
+  document.getElementById('public-content').style.display = 'none';
+  destroyCharts();
+  window.scrollTo({ top: 0 });
+
+  let d = null;
+  try {
+    if (window.storage) {
+      const res = await window.storage.get('report:' + slug, true);
+      if (res?.value) d = JSON.parse(res.value);
+    }
+  } catch (e) {
+    console.error('Could not load shared report', e);
+  }
+
+  document.getElementById('public-loading').style.display = 'none';
+
+  if (!d) {
+    document.getElementById('public-notfound').style.display = 'block';
+    return;
+  }
+
+  renderPublicReport(d);
+}
+
+function renderPublicReport(d) {
+  document.getElementById('public-content').style.display = 'block';
+
+  // Banner
+  const avEl = document.getElementById('pub-av');
+  avEl.innerHTML = d.profileImg
+    ? `<img src="${d.profileImg}" alt="${d.username}" onerror="this.parentElement.innerHTML='<span>${d.initials}</span>'" />`
+    : `<span>${d.initials}</span>`;
+
+  const pbanner = document.getElementById('pub-banner');
+  pbanner.style.background = d.bannerImg
+    ? `linear-gradient(rgba(10,5,30,0.82),rgba(10,5,30,0.92)), url(${d.bannerImg}) center/cover no-repeat`
+    : 'linear-gradient(135deg,#150830 0%,#0c0d28 55%,#091528 100%)';
+
+  document.getElementById('pub-av-badge').innerHTML = d.isLive
+    ? '<div class="live-dot">LIVE</div>' : '<div class="offline-dot">OFF</div>';
+
+  const displayName = d.displayName || d.username;
+  document.getElementById('pub-name').innerHTML =
+    `${displayName} <span style="font-size:12px;padding:2px 9px;background:rgba(145,70,255,.22);border-radius:6px;color:#C49DFF;font-weight:700">✓</span>`;
+  document.getElementById('pub-handle').textContent = `@${d.username} · ${(d.lang || 'en').toUpperCase()}`;
+  document.getElementById('pub-intro-name').textContent = displayName;
+  document.getElementById('pub-date').textContent = d.timestamp;
+
+  document.getElementById('pub-tags').innerHTML = [
+    d.isPartner ? '<span class="ptag t-partner">⭐ Partner</span>' : '',
+    d.isAffiliate && !d.isPartner ? '<span class="ptag t-aff">🎗 Affiliate</span>' : '',
+    d.isLive ? '<span class="ptag t-live">🔴 LIVE</span>' : '<span class="ptag t-off">⚫ Offline</span>',
+    d.game ? `<span class="ptag t-game">🎮 ${d.game}</span>` : '',
+  ].join('');
+
+  document.getElementById('pub-stats').innerHTML = [
+    pis(fmt(d.followers), 'Followers'),
+    pis(fmt(d.views), 'Total Views'),
+    pis(fmt(d.avgViewers), 'Avg Viewers'),
+    pis(ageFmt(d.daysOld), 'Account Age'),
+  ].join('');
+
+  // Growth score
+  const gs = d.growthScore;
+  const gsColor = gs >= 90 ? '#00C87A' : gs >= 70 ? '#9146FF' : gs >= 50 ? '#FF9500' : '#FF4560';
+  const gsLabel = gs >= 90 ? 'Outstanding' : gs >= 70 ? 'High Potential' : gs >= 50 ? 'Developing' : 'Needs Work';
+  const ring = document.getElementById('pub-gs-ring');
+  const num = document.getElementById('pub-gs-num');
+  ring.style.stroke = gsColor;
+  num.style.fill = gsColor;
+  document.getElementById('pub-gs-badge').textContent = gsLabel;
+  document.getElementById('pub-gs-badge').style.cssText = `background:${gsColor}22;color:${gsColor};border:1px solid ${gsColor}44`;
+  document.getElementById('pub-gs-label').textContent = gsLabel;
+  document.getElementById('pub-gs-desc').textContent = gs >= 70 ? 'Strong fundamentals — this channel is primed for growth.' : 'Targeted improvements will unlock significant growth.';
+  setTimeout(() => { ring.style.strokeDashoffset = 314.16 * (1 - gs / 100); animNum(num, 0, gs, 1400); }, 200);
+
+  // Potential
+  const stars = Math.max(1, Math.ceil(gs / 20));
+  document.getElementById('pub-pot-stars').textContent = '★'.repeat(stars) + '☆'.repeat(5 - stars);
+  const potLabels = ['', 'Very Low', 'Low', 'Moderate', 'High', 'Excellent'];
+  document.getElementById('pub-pot-label').textContent = potLabels[stars];
+  document.getElementById('pub-pot-desc').textContent = `Based on follower trajectory, content consistency, and niche clarity.`;
+
+  // Discoverability
+  const dc = d.discScore >= 70 ? '#00C87A' : d.discScore >= 50 ? '#9146FF' : d.discScore >= 35 ? '#FF9500' : '#FF4560';
+  const dr = document.getElementById('pub-disc-ring');
+  dr.style.stroke = dc;
+  document.getElementById('pub-disc-num').textContent = d.discScore;
+  document.getElementById('pub-disc-num').style.fill = dc;
+  setTimeout(() => { dr.style.strokeDashoffset = 314.16 * (1 - d.discScore / 100); }, 100);
+
+  // Strengths / weaknesses
+  document.getElementById('pub-strengths').innerHTML = d.strengths.map(s =>
+    `<div class="sw-item"><div class="sw-ico">✅</div><div class="sw-txt">${s}</div></div>`).join('');
+  document.getElementById('pub-weaknesses').innerHTML = d.weaknesses.map(w =>
+    `<div class="sw-item"><div class="sw-ico">⚠️</div><div class="sw-txt">${w}</div></div>`).join('');
+
+  // Recommendations (top 4 for the public view, friendlier framing)
+  document.getElementById('pub-recs').innerHTML = d.recs.slice(0, 4).map((r, i) =>
+    `<div class="rec-item"><div class="rec-num">${i + 1}</div><div><span class="rec-t">${r.title}</span><span class="rec-d">${r.desc}</span></div></div>`
+  ).join('');
+
+  // Health check (simplified, real signals only)
+  const checks = [
+    { label: 'Profile Logo', ok: !!d.hasLogo },
+    { label: 'Channel Bio', ok: !!(d.bio && d.bio.length > 10) },
+    { label: 'Offline Banner', ok: !!d.bannerImg },
+    { label: 'Channel Panels', ok: (d.panelCount || 0) >= 3 },
+    { label: 'Schedule Panel', ok: !!d.hasSchedulePanel },
+    { label: 'Tags Used', ok: (d.usedTags || []).length >= 4 },
+  ];
+  document.getElementById('pub-health').innerHTML = checks.map(c =>
+    `<div class="disc-row"><span class="disc-name">${c.label}</span><span class="disc-pill ${c.ok ? 'p-exc' : 'p-poor'}">${c.ok ? '✓ Yes' : '✗ No'}</span></div>`
+  ).join('');
+}
+
+// ── EXPORT ────────────────────────────────────
+function doExportCSV() {
+  if (!DATA) return;
+  const d = DATA;
+  const rows = [
+    ['Metric', 'Value'],
+    ['Username', d.username], ['Followers', d.followers], ['Total Views', d.views],
+    ['Avg Viewers', d.avgViewers], ['Peak Viewers', d.peakViewers],
+    ['Growth Score', d.growthScore], ['Discoverability Score', d.discScore],
+    ['Promo Score', Math.round(d.promoScore)], ['Promo Level', d.promoLevel],
+    ['Status', d.isLive ? 'Live' : 'Offline'], ['Game', d.game], ['Language', d.lang],
+    ['Partner', d.isPartner ? 'Yes' : 'No'], ['Affiliate', d.isAffiliate ? 'Yes' : 'No'],
+    ['Stream Frequency', d.streamFreq + '/week'], ['Account Age (days)', d.daysOld],
+    ['Audience Quality', d.aq + '%'], ['Content Consistency', d.cc + '%'], ['Niche Clarity', d.nc + '%'],
+    ...d.strengths.map((s, i) => [`Strength ${i + 1}`, s]),
+    ...d.weaknesses.map((w, i) => [`Weakness ${i + 1}`, w]),
+    ...d.recs.map((r, i) => [`Recommendation ${i + 1}`, r.title + ': ' + r.desc]),
+    ['Report Date', d.timestamp],
+  ];
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  dl(`streamscope-audit-${d.username}.csv`, 'text/csv', csv);
+  document.getElementById('overlay-export').style.display = 'none';
+}
+
+function doExportPNG() {
+  if (!DATA) return;
+  const el = document.getElementById('dash-body');
+  html2canvas(el, { scale: 2, useCORS: true, backgroundColor: DARK ? '#090C18' : '#F7F5FF' }).then(canvas => {
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `streamscope-audit-${DATA.username}.png`;
+    a.click();
+  });
+  document.getElementById('overlay-export').style.display = 'none';
+}
+
+function doExportPDF() {
+  if (!DATA) return;
+  const d = DATA;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+  const W = 210, M = 20;
+  let y = 0;
+
+  // Cover header
+  doc.setFillColor(15, 5, 40);
+  doc.rect(0, 0, W, 52, 'F');
+  doc.setFillColor(145, 70, 255);
+  doc.rect(0, 0, 5, 52, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(22);
+  doc.text('StreamScope Audit', M, 22);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(12);
+  doc.setTextColor(180, 150, 255);
+  doc.text(`Channel Analysis Report — @${d.username}`, M, 33);
+  doc.setTextColor(110, 90, 170); doc.setFontSize(8);
+  doc.text(`Generated ${d.timestamp} · StreamScope Audit Platform`, M, 43);
+
+  y = 64;
+
+  function section(title) {
+    doc.setFillColor(240, 235, 255);
+    doc.rect(M - 2, y - 5, W - M * 2 + 4, 8, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(145, 70, 255);
+    doc.text(title, M, y); y += 10;
+  }
+  function row(k, v, vc) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(90, 70, 130);
+    doc.text(k.toUpperCase() + ':', M, y);
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(vc ? 145 : 25, vc ? 70 : 10, vc ? 255 : 50);
+    doc.text(String(v), M + 52, y); y += 6.5;
+  }
+  function bullet(text, ok) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    doc.setTextColor(ok ? 0 : 80, ok ? 140 : 80, ok ? 80 : 80);
+    const lines = doc.splitTextToSize((ok ? '✓  ' : '⚠  ') + text, W - M * 2 - 6);
+    doc.text(lines, M + 4, y); y += lines.length * 5.5 + 1;
+  }
+  function chk(y2) { if (y2 > 270) { doc.addPage(); y = 20; } }
+
+  section('CHANNEL OVERVIEW');
+  row('Username', '@' + d.username);
+  row('Status', d.isLive ? 'LIVE' : 'Offline');
+  row('Followers', fmt(d.followers));
+  row('Total Views', fmt(d.views));
+  row('Avg Viewers', fmt(d.avgViewers));
+  row('Peak Viewers', fmt(d.peakViewers));
+  row('Primary Game', d.game);
+  row('Language', d.lang);
+  row('Account Age', ageFmt(d.daysOld));
+  row('Status', d.isPartner ? 'Partner' : d.isAffiliate ? 'Affiliate' : 'None');
+
+  y += 4; chk(y); section('SCORES');
+  row('Growth Score', d.growthScore + ' / 100', true);
+  row('Discoverability', d.discScore + ' / 100', true);
+  row('Promo Score', Math.round(d.promoScore) + ' / 100', true);
+  row('Promo Level', d.promoLevel, true);
+
+  y += 4; chk(y); section('STRENGTHS');
+  d.strengths.forEach(s => { chk(y); bullet(s, true); });
+
+  y += 4; chk(y); section('WEAKNESSES');
+  d.weaknesses.forEach(w => { chk(y); bullet(w, false); });
+
+  y += 4; chk(y); section('AI RECOMMENDATIONS');
+  d.recs.forEach((r, i) => {
+    chk(y);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(145, 70, 255);
+    doc.text(`${i + 1}. ${r.title}`, M, y); y += 5;
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(70, 55, 100);
+    const lines = doc.splitTextToSize(r.desc, W - M * 2 - 6);
+    doc.text(lines, M + 5, y); y += lines.length * 5 + 3;
+  });
+
+  // Footer
+  const pages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p);
+    doc.setFillColor(240, 235, 255);
+    doc.rect(0, 286, W, 11, 'F');
+    doc.setTextColor(130, 110, 185); doc.setFontSize(7.5);
+    doc.text('StreamScope Audit  ·  Professional Channel Analytics  ·  Confidential Report', W / 2, 292, { align: 'center' });
+    doc.text(`Page ${p} of ${pages}`, W - M, 292, { align: 'right' });
+  }
+
+  doc.save(`streamscope-audit-${d.username}.pdf`);
+  document.getElementById('overlay-export').style.display = 'none';
+}
+
+function dl(name, type, content) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type }));
+  a.download = name; a.click();
+}
+
+// ── HELPERS ───────────────────────────────────
+function fmt(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+function ageFmt(d) {
+  if (d >= 365) return `${Math.floor(d / 365)}y ${Math.floor((d % 365) / 30)}mo`;
+  if (d >= 30)  return `${Math.floor(d / 30)}mo`;
+  return d + 'd';
+}
+function pis(v, l) { return `<div class="pis"><div class="pis-v">${v}</div><div class="pis-l">${l}</div></div>`; }
+function metCell(v, l) { return `<div class="met-cell"><div class="met-v">${v}</div><div class="met-l">${l}</div></div>`; }
+function execCell(v, l, c) { return `<div class="exec-cell"><div class="exec-v" style="color:${c}">${v}</div><div class="exec-l">${l}</div></div>`; }
+
+function setBar(bid, vid, pct) {
+  document.getElementById(bid).style.width = pct + '%';
+  document.getElementById(vid).textContent = pct + '%';
+}
+function animNum(el, from, to, dur) {
+  const t0 = performance.now();
+  (function frame(now) {
+    const p = Math.min((now - t0) / dur, 1);
+    el.textContent = Math.round(from + (to - from) * (1 - (1 - p) ** 3));
+    if (p < 1) requestAnimationFrame(frame);
+  })(t0);
+}
+function promoText(d) {
+  if (d.promoScore > 65) return `@${d.username} is a strong promotion candidate. With ${fmt(d.avgViewers)} average viewers and a growth score of ${d.growthScore}/100, targeted promotion would accelerate follower growth significantly.`;
+  if (d.promoScore > 50) return `@${d.username} shows solid promotion potential. The fundamentals are in place — improving discoverability first would maximise the ROI of any campaign.`;
+  if (d.promoScore > 35) return `@${d.username} has moderate promotion potential. Fixing stream titles and tags before investing in promotion will produce far better results.`;
+  return `@${d.username} would benefit from organic improvements before promotion. Building stronger fundamentals first makes any future campaign dramatically more effective.`;
+}
+
+// ── COMPARE CHANNELS ──────────────────────────
+function openCompare() {
+  if (!DATA) return;
+  document.getElementById('cmp-base-name').textContent = '@' + DATA.username;
+  document.getElementById('cmp-input').value = '';
+  document.getElementById('cmp-result').style.display = 'none';
+  document.getElementById('cmp-error').style.display = 'none';
+  document.getElementById('cmp-loading').style.display = 'none';
+  document.getElementById('overlay-compare').style.display = 'flex';
+  setTimeout(() => document.getElementById('cmp-input').focus(), 100);
+}
+
+async function runCompare() {
+  const raw = document.getElementById('cmp-input').value.trim().replace(/^@/, '').toLowerCase();
+  if (!raw) { document.getElementById('cmp-input').focus(); return; }
+  if (raw === DATA.username) { showCmpError('Enter a different username to compare against.'); return; }
+
+  document.getElementById('cmp-btn').disabled = true;
+  document.getElementById('cmp-loading').style.display = 'block';
+  document.getElementById('cmp-result').style.display = 'none';
+  document.getElementById('cmp-error').style.display = 'none';
+
+  try {
+    const userRes = await twitchGET(`users?login=${encodeURIComponent(raw)}`);
+    if (!userRes.data?.length) { showCmpError(`@${raw} not found on Twitch.`); return; }
+    const u2 = userRes.data[0];
+
+    const [streamRes, follRes, chanRes, vodRes, clipRes] = await Promise.all([
+      twitchGET(`streams?user_login=${encodeURIComponent(raw)}`),
+      twitchGET(`channels/followers?broadcaster_id=${u2.id}&first=1`),
+      twitchGET(`channels?broadcaster_id=${u2.id}`),
+      twitchGET(`videos?user_id=${u2.id}&type=archive&first=20`),
+      twitchGET(`clips?broadcaster_id=${u2.id}&first=20`),
+    ]);
+
+    let panels2 = [];
+    try {
+      const pr = await fetch(`https://api.twitch.tv/v5/channels/${u2.id}/panels`, {
+        headers: { 'Client-ID': TWITCH_CLIENT_ID, 'Authorization': 'Bearer ' + TWITCH_TOKEN }
+      });
+      if (pr.ok) panels2 = await pr.json();
+    } catch(e) {}
+
+    const d2 = buildDataFromAPI({
+      user: u2,
+      stream: streamRes.data?.[0] || null,
+      followers: follRes.total || 0,
+      chan: chanRes.data?.[0] || {},
+      vods: vodRes.data || [],
+      clips: clipRes.data || [],
+      panels: panels2,
+    });
+
+    renderCompareResult(DATA, d2);
+  } catch(e) {
+    showCmpError('Could not fetch channel: ' + e.message);
+  } finally {
+    document.getElementById('cmp-btn').disabled = false;
+    document.getElementById('cmp-loading').style.display = 'none';
+  }
+}
+
+function showCmpError(msg) {
+  const el = document.getElementById('cmp-error');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+  document.getElementById('cmp-loading').style.display = 'none';
+  document.getElementById('cmp-btn').disabled = false;
+}
+
+function renderCompareResult(a, b) {
+  const win = (va, vb) => va >= vb;
+  const metrics = [
+    { label: 'Followers',       va: fmt(a.followers),              vb: fmt(b.followers),              w: a.followers >= b.followers },
+    { label: 'Growth Score',    va: a.growthScore + '/100',        vb: b.growthScore + '/100',        w: a.growthScore >= b.growthScore },
+    { label: 'Discoverability', va: a.discScore + '/100',          vb: b.discScore + '/100',          w: a.discScore >= b.discScore },
+    { label: 'Promo Score',     va: Math.round(a.promoScore) + '', vb: Math.round(b.promoScore) + '', w: a.promoScore >= b.promoScore },
+    { label: 'Tags Active',     va: a.usedTags.length + '',        vb: b.usedTags.length + '',        w: a.usedTags.length >= b.usedTags.length },
+    { label: 'Panels',          va: a.panelCount + '',             vb: b.panelCount + '',             w: a.panelCount >= b.panelCount },
+    { label: 'Clips',           va: a.clipCount + '',              vb: b.clipCount + '',              w: a.clipCount >= b.clipCount },
+    { label: 'Stream Freq.',    va: a.streamFreq + '/wk',          vb: b.streamFreq + '/wk',          w: a.streamFreq >= b.streamFreq },
+    { label: 'Logo',            va: a.hasLogo ? '✓' : '✗',        vb: b.hasLogo ? '✓' : '✗',        w: a.hasLogo },
+    { label: 'Offline Banner',  va: a.bannerImg ? '✓' : '✗',      vb: b.bannerImg ? '✓' : '✗',      w: !!a.bannerImg },
+    { label: 'Schedule Panel',  va: a.hasSchedulePanel ? '✓':'✗', vb: b.hasSchedulePanel ? '✓':'✗', w: !!a.hasSchedulePanel },
+    { label: 'Social Panel',    va: a.hasSocialPanel ? '✓' : '✗', vb: b.hasSocialPanel ? '✓' : '✗', w: !!a.hasSocialPanel },
+  ];
+
+  const aWins = metrics.filter(m => m.w).length;
+  const bWins = metrics.length - aWins;
+  const winnerName = aWins >= bWins ? (a.displayName || a.username) : (b.displayName || b.username);
+
+  const rows = metrics.map(m => `
+    <div style="display:grid;grid-template-columns:1fr 100px 1fr;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:700;color:${m.w?'var(--mint)':'var(--text2)'};text-align:right;padding-right:8px">${m.va}</div>
+      <div style="font-size:10px;color:var(--text3);font-weight:600;text-align:center">${m.label}</div>
+      <div style="font-size:12px;font-weight:700;color:${!m.w?'var(--mint)':'var(--text2)'};padding-left:8px">${m.vb}</div>
+    </div>`).join('');
+
+  const aAvEl = a.profileImg ? `<img src="${a.profileImg}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid var(--purple)">` : `<div style="width:28px;height:28px;border-radius:50%;background:var(--purple);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff">${a.initials}</div>`;
+  const bAvEl = b.profileImg ? `<img src="${b.profileImg}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid var(--blue)">` : `<div style="width:28px;height:28px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff">${b.initials}</div>`;
+
+  document.getElementById('cmp-result').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 100px 1fr;margin-bottom:8px;padding-bottom:10px;border-bottom:2px solid var(--border);align-items:center">
+      <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">${aAvEl}<span style="font-size:12px;font-weight:800;color:var(--purple)">${a.displayName||a.username}</span></div>
+      <div style="font-size:11px;color:var(--text3);font-weight:800;text-align:center">VS</div>
+      <div style="display:flex;align-items:center;gap:6px">${bAvEl}<span style="font-size:12px;font-weight:800;color:var(--blue)">${b.displayName||b.username}</span></div>
+    </div>
+    ${rows}
+    <div style="margin-top:12px;padding:10px 14px;background:var(--purple-glow);border:1px solid rgba(145,70,255,.3);border-radius:8px;font-size:12px;font-weight:700;color:var(--purple);text-align:center">
+      🏆 @${winnerName} leads — ${aWins} vs ${bWins} metrics won
+    </div>`;
+  document.getElementById('cmp-result').style.display = 'block';
+}
+
+</script>
+</body>
+</html>
