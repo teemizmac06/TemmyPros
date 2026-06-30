@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>(function(){if(sessionStorage.getItem("tp_auth")!=="1"){window.location.replace("index.html");}})();</script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Twitch Card Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #eaeaef;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    color: #111;
+  }
+
+  /* ── TOP NAV ── */
+  .topnav {
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 14px 32px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    flex-shrink: 0;
+  }
+  .topnav-title { font-weight: 900; font-size: 16px; color: #111; letter-spacing: -0.3px; }
+  .topnav-sub   { font-size: 11px; color: #9ca3af; margin-top: 1px; }
+  .spacer { flex: 1; }
+  .btn-dl-nav {
+    background: linear-gradient(90deg,#7b2ff7,#a855f7);
+    color: #fff; border: none; border-radius: 12px;
+    padding: 10px 24px; font-size: 13px; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 4px 14px rgba(145,71,255,0.35); font-family: inherit;
+  }
+  .btn-dl-nav:hover { opacity: .92; }
+
+  /* ── LAYOUT ── */
+  .body-wrap { display: flex; flex: 1; overflow: auto; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 290px; flex-shrink: 0;
+    background: #fff; border-right: 1px solid #e5e7eb;
+    padding: 24px 20px; overflow-y: auto;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.04);
+  }
+  .sidebar-heading {
+    font-size: 10px; font-weight: 800; color: #9147ff;
+    text-transform: uppercase; letter-spacing: .08em; margin-bottom: 18px;
+  }
+  .lbl {
+    display: block; font-size: 11px; font-weight: 700; color: #6b7280;
+    margin-bottom: 5px; text-transform: uppercase; letter-spacing: .06em;
+  }
+  .fi, .fs {
+    width: 100%; background: #f9f9fb; border: 1.5px solid #e5e7eb;
+    color: #111; border-radius: 10px; padding: 9px 13px;
+    font-size: 13px; outline: none; font-family: inherit; margin-bottom: 14px;
+    transition: border-color .15s;
+  }
+  .fi:focus, .fs:focus { border-color: #9147ff; }
+  .divider {
+    display: flex; align-items: center; gap: 8px; margin: 18px 0 14px;
+  }
+  .divider-line { flex: 1; height: 1px; background: #e5e7eb; }
+  .divider-lbl {
+    font-size: 10px; font-weight: 800; color: #9147ff;
+    text-transform: uppercase; letter-spacing: .1em;
+  }
+
+  /* pfp row */
+  .pfp-row { display: flex; align-items: center; gap: 12px; margin: 8px 0 16px; }
+  .pfp-thumb {
+    width: 54px; height: 54px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+    background: linear-gradient(135deg,#9147ff,#6441a5);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 22px; font-weight: 800;
+  }
+  .pfp-thumb img { width: 100%; height: 100%; object-fit: cover; display: none; }
+
+  /* tier icon row */
+  .icon-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .icon-thumb {
+    width: 34px; height: 34px; border-radius: 7px;
+    border: 1.5px dashed #d8b4fe; background: #f3f0ff;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; flex-shrink: 0; cursor: pointer; transition: all .15s;
+  }
+  .icon-thumb:hover { border-color: #9147ff; background: #ede9ff; }
+  .icon-thumb img { width: 100%; height: 100%; object-fit: contain; display: none; }
+  .icon-thumb svg { display: block; }
+
+  /* shared upload/remove buttons */
+  .btn-up {
+    background: #f3f0ff; border: 1.5px solid #d8b4fe; color: #7c3aed;
+    border-radius: 10px; padding: 8px 14px; font-size: 12px;
+    cursor: pointer; font-weight: 700; font-family: inherit;
+  }
+  .btn-up.sm { padding: 7px 12px; font-size: 11px; flex: 1; }
+  .btn-rm {
+    background: #fff0f0; border: 1.5px solid #fca5a5; color: #dc2626;
+    border-radius: 10px; padding: 8px 10px; font-size: 12px;
+    cursor: pointer; font-weight: 700; font-family: inherit; display: none;
+  }
+  .btn-rm.sm { padding: 7px 10px; font-size: 11px; }
+
+  /* toggle */
+  .toggle-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tbtn {
+    flex: 1; border-radius: 10px; padding: 8px; font-size: 12px;
+    cursor: pointer; font-weight: 700; font-family: inherit;
+    background: #f9f9fb; border: 1.5px solid #e5e7eb; color: #555; transition: all .15s;
+  }
+  .tbtn.on { background: #f0ebff; border-color: #9147ff; color: #7c3aed; }
+
+  .btn-reset {
+    margin-top: 6px; width: 100%; background: #fff; border: 1.5px solid #e5e7eb;
+    color: #9ca3af; border-radius: 10px; padding: 9px; font-size: 12px;
+    cursor: pointer; font-weight: 600; font-family: inherit;
+  }
+  .btn-reset:hover { border-color: #ccc; color: #777; }
+
+  /* ── PREVIEW ── */
+  .preview {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start;
+    padding: 48px 32px; gap: 24px;
+  }
+  .preview-hint { color: #9ca3af; font-size: 12px; }
+  .card-wrap {
+    border-radius: 32px;
+    box-shadow: 0 8px 48px rgba(145,71,255,.14), 0 2px 12px rgba(0,0,0,.10);
+  }
+  .btn-dl-main {
+    background: linear-gradient(90deg,#7b2ff7,#a855f7);
+    color: #fff; border: none; border-radius: 14px; padding: 15px 44px;
+    font-size: 15px; font-weight: 800; cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 6px 28px rgba(145,71,255,.4);
+    letter-spacing: .01em; font-family: inherit;
+  }
+  .btn-dl-main:hover { opacity: .92; }
+  .dl-hint { color: #c4b5fd; font-size: 11px; }
+
+  /* ════════════════════════════
+     CARD
+  ════════════════════════════ */
+  .card {
+    width: 370px; background: #eaeaef; border-radius: 28px;
+    padding: 28px 22px 24px; font-family: 'Inter', -apple-system, sans-serif;
+  }
+  .c-title {
+    font-weight: 900; font-size: 30px; line-height: 1.15;
+    color: #111; letter-spacing: -.5px; margin-bottom: 8px;
+  }
+  .c-sub { color: #9ca3af; font-size: 13px; font-weight: 400; margin-bottom: 18px; }
+  .c-search {
+    display: flex; align-items: center; background: #f3f3f6;
+    border: 1.5px solid #ddd; border-radius: 99px;
+    padding: 7px 7px 7px 18px; margin-bottom: 22px; gap: 6px;
+  }
+  .c-search-ph { flex: 1; color: #c0c0cc; font-size: 14px; }
+  .c-check {
+    background: #18181b; color: #fff; border-radius: 99px;
+    padding: 9px 22px; font-size: 14px; font-weight: 700; letter-spacing: .01em;
+  }
+  /* profile block */
+  .c-profile {
+    background: #fff; border-radius: 18px; padding: 16px 18px;
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+  .c-avatar {
+    width: 60px; height: 60px; border-radius: 50%; overflow: hidden;
+    flex-shrink: 0; background: linear-gradient(135deg,#9147ff,#6441a5);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 24px; font-weight: 800;
+  }
+  .c-avatar img { width: 100%; height: 100%; object-fit: cover; display: none; }
+  .c-info { flex: 1; min-width: 0; }
+  .c-name-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .c-name { font-weight: 800; font-size: 17px; color: #0f0f0f; }
+  .c-follow-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .c-followers { color: #555; font-size: 13px; font-weight: 500; }
+  .c-badge {
+    background: #f0ebff; border: 1px solid #e0d4ff; border-radius: 8px;
+    padding: 3px 10px 3px 7px; font-size: 12px; font-weight: 700; color: #3d1a7a;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .c-badge-icon {
+    width: 15px; height: 15px; display: flex; align-items: center;
+    justify-content: center; overflow: hidden; flex-shrink: 0;
+  }
+  .c-badge-icon img { width: 100%; height: 100%; object-fit: contain; display: none; }
+  .c-badge-icon svg { display: block; }
+  .c-rank { font-size: 12.5px; color: #888; }
+  .c-rank strong { color: #222; font-weight: 800; }
+  .c-dots { color: #ccc; font-size: 18px; align-self: flex-start; margin-top: 4px; }
+  /* banner */
+  .c-banner {
+    background: linear-gradient(90deg,#6b21c8 0%,#9147ff 55%,#a855f7 100%);
+    border-radius: 18px; padding: 16px 22px;
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;
+  }
+  .c-banner-side { display: flex; align-items: center; gap: 12px; }
+  .c-bval { color: #fff; font-weight: 900; font-size: 28px; line-height: 1; letter-spacing: -.5px; }
+  .c-blbl { color: #ddd6fe; font-size: 13px; margin-top: 2px; font-weight: 500; }
+  .c-bdiv { width: 1px; height: 44px; background: rgba(255,255,255,.25); flex-shrink: 0; }
+  /* icons */
+  .c-icons { display: flex; justify-content: center; gap: 14px; margin-bottom: 18px; }
+  .c-icon {
+    width: 48px; height: 48px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .c-icon.pu { background: #7c3aed; }
+  .c-icon.bl { background: #5b9bd5; }
+  .c-icon.gr { background: #3dba8c; }
+  /* stats */
+  .c-stats { display: flex; gap: 10px; }
+  .c-stat {
+    flex: 1; background: #fff; border-radius: 16px;
+    padding: 16px 8px 14px; text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,.05);
+  }
+  .c-sval { font-weight: 900; font-size: 22px; color: #111; letter-spacing: -.5px; }
+  .c-slbl { color: #9ca3af; font-size: 11px; margin-top: 5px; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="topnav">
+  <svg width="30" height="30" viewBox="0 0 256 268" fill="none">
+    <rect width="256" height="268" rx="28" fill="#9147ff"/>
+    <path d="M53 22L22 53v163l54 54h54l27 26h54l54-54V22H53z" fill="#fff"/>
+    <rect x="90" y="90" width="28" height="56" rx="4" fill="#9147ff"/>
+    <rect x="138" y="90" width="28" height="56" rx="4" fill="#9147ff"/>
+    <path d="M90 162h28v28l28-28h28" stroke="#9147ff" stroke-width="12" stroke-linecap="square" fill="none"/>
+  </svg>
+  <div>
+    <div class="topnav-title">Paid Twitch Engagement Rate Analytic</div>
+    <div class="topnav-sub">Card Editor — edit values and download in HD</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn-dl-nav" id="btnDlNav">
+    <svg width="15" height="15" fill="none" viewBox="0 0 15 15">
+      <path d="M7.5 1v9m0 0L4 7m3.5 3L11 7M1 12h13" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Download HD
+  </button>
+</nav>
+
+<div class="body-wrap">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <p class="sidebar-heading">✦ Edit Card</p>
+
+    <!-- Profile picture -->
+    <label class="lbl">Profile Picture</label>
+    <div class="pfp-row">
+      <div class="pfp-thumb" id="sidebarAvatar">
+        <span id="sidebarInitial">S</span>
+        <img id="sidebarAvatarImg" src="" alt="" />
+      </div>
+      <button class="btn-up" id="btnUpPfp">Upload Photo</button>
+      <button class="btn-rm" id="btnRmPfp">✕</button>
+      <input type="file" id="pfpInput" accept="image/*" style="display:none" />
+    </div>
+
+    <!-- Profile section -->
+    <div class="divider"><div class="divider-line"></div><span class="divider-lbl">Profile</span><div class="divider-line"></div></div>
+
+    <label class="lbl">Username</label>
+    <input class="fi" id="fUsername" value="sebbo1693" />
+
+    <label class="lbl">Followers</label>
+    <input class="fi" id="fFollowers" value="4,385k" />
+
+    <label class="lbl">Rank #</label>
+    <input class="fi" id="fRank" value="65,299" />
+
+    <label class="lbl">Rank Label</label>
+    <input class="fi" id="fRankLabel" value="Ranked in Twitch Top 3%" />
+
+    <label class="lbl">Tier</label>
+    <select class="fs" id="fTier">
+      <option>Partner</option>
+      <option>Affiliate</option>
+      <option>None</option>
+    </select>
+
+    <!-- Tier badge icon -->
+    <label class="lbl">Tier Badge Icon</label>
+    <div class="icon-row">
+      <div class="icon-thumb" id="tierThumb">
+        <svg id="tierIconSvg" width="20" height="20" viewBox="0 0 256 268" fill="none">
+          <rect width="256" height="268" rx="28" fill="#9147ff"/>
+          <path d="M53 22L22 53v163l54 54h54l27 26h54l54-54V22H53z" fill="#fff"/>
+          <rect x="90" y="90" width="28" height="56" rx="4" fill="#9147ff"/>
+          <rect x="138" y="90" width="28" height="56" rx="4" fill="#9147ff"/>
+          <path d="M90 162h28v28l28-28h28" stroke="#9147ff" stroke-width="12" stroke-linecap="square" fill="none"/>
+        </svg>
+        <img id="tierThumbImg" src="" alt="" />
+      </div>
+      <button class="btn-up sm" id="btnUpTier">Upload Icon</button>
+      <button class="btn-rm sm" id="btnRmTier">✕</button>
+      <input type="file" id="tierInput" accept="image/*" style="display:none" />
+    </div>
+
+    <label class="lbl">Verified Badge</label>
+    <div class="toggle-row">
+      <button class="tbtn on" id="btnVerY">✓ Verified</button>
+      <button class="tbtn" id="btnVerN">× None</button>
+    </div>
+
+    <!-- Stats section -->
+    <div class="divider"><div class="divider-line"></div><span class="divider-lbl">Stats</span><div class="divider-line"></div></div>
+
+    <label class="lbl">Total Bits</label>
+    <input class="fi" id="fBits" value="$567" />
+
+    <label class="lbl">Total Subscribers</label>
+    <input class="fi" id="fSubs" value="306" />
+
+    <!-- Engagement section -->
+    <div class="divider"><div class="divider-line"></div><span class="divider-lbl">Engagement</span><div class="divider-line"></div></div>
+
+    <label class="lbl">Engagement Rate</label>
+    <input class="fi" id="fEngRate" value="60%" />
+
+    <label class="lbl">Avg Daily Subscribers</label>
+    <input class="fi" id="fAvgSubs" value="45%" />
+
+    <label class="lbl">Average Viewers</label>
+    <input class="fi" id="fAvgViewers" value="103" />
+
+    <button class="btn-reset" id="btnReset">Reset to Default</button>
+  </aside>
+
+  <!-- PREVIEW -->
+  <main class="preview">
+    <p class="preview-hint">Live Preview — changes reflect instantly</p>
+
+    <div class="card-wrap">
+      <div class="card" id="theCard">
+
+        <div class="c-title">Paid Twitch<br>Engagement Rate Analytic</div>
+        <div class="c-sub">Calculate your Twitch engagement to benchmark performance</div>
+
+        <div class="c-search">
+          <span class="c-search-ph">Enter Twitch @username</span>
+          <div class="c-check">Check</div>
+        </div>
+
+        <div class="c-profile">
+          <!-- avatar: initial letter + uploaded img (one shown at a time) -->
+          <div class="c-avatar" id="cardAvatar">
+            <span id="cardInitial">S</span>
+            <img id="cardAvatarImg" src="" alt="" />
+          </div>
+
+          <div class="c-info">
+            <div class="c-name-row">
+              <span class="c-name" id="cardName">@sebbo1693</span>
+              <span id="cardVerified">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <circle cx="9" cy="9" r="9" fill="#1d9bf0"/>
+                  <path d="M5.5 9.5l2.5 2.5 5-5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+            </div>
+            <div class="c-follow-row">
+              <span class="c-followers" id="cardFollowers">4,385k Followers</span>
+              <span class="c-badge" id="cardBadge">
+                <!-- badge icon: svg default + uploaded img -->
+                <span class="c-badge-icon" id="cardBadgeIcon">
+                  <svg id="badgeIconSvg" width="15" height="15" viewBox="0 0 256 268" fill="none">
+                    <rect width="256" height="268" rx="28" fill="#9147ff"/>
+                    <path d="M53 22L22 53v163l54 54h54l27 26h54l54-54V22H53z" fill="#fff"/>
+                    <rect x="90" y="90" width="28" height="56" rx="4" fill="#9147ff"/>
+                    <rect x="138" y="90" width="28" height="56" rx="4" fill="#9147ff"/>
+                    <path d="M90 162h28v28l28-28h28" stroke="#9147ff" stroke-width="12" stroke-linecap="square" fill="none"/>
+                  </svg>
+                  <img id="badgeIconImg" src="" alt="" />
+                </span>
+                <span id="cardTierText">Partner</span>
+              </span>
+            </div>
+            <div class="c-rank">
+              <strong># <span id="cardRank">65,299</span></strong>&nbsp;&nbsp;<span id="cardRankLabel">Ranked in Twitch Top 3%</span>
+            </div>
+          </div>
+          <div class="c-dots">⋮</div>
+        </div>
+
+        <!-- Banner -->
+        <div class="c-banner">
+          <div class="c-banner-side">
+            <svg width="38" height="44" viewBox="0 0 38 44" fill="none">
+              <polygon points="19,0 38,11 38,33 19,44 0,33 0,11" fill="#b9a3f7"/>
+              <polygon points="19,6 32,13 32,31 19,38 6,31 6,13" fill="#9147ff"/>
+              <polygon points="19,12 26,16 26,28 19,32 12,28 12,16" fill="#7c3aed"/>
+              <polygon points="19,18 23,21 23,27 19,30 15,27 15,21" fill="#c4b5fd"/>
+            </svg>
+            <div>
+              <div class="c-bval" id="cardBits">$567</div>
+              <div class="c-blbl">Total Bits</div>
+            </div>
+          </div>
+          <div class="c-bdiv"></div>
+          <div class="c-banner-side">
+            <svg width="36" height="40" viewBox="0 0 36 40" fill="none">
+              <path d="M18 8 C14 4 8 5 9 9 C10 13 18 12 18 12 C18 12 26 13 27 9 C28 5 22 4 18 8Z" fill="#c4b5fd"/>
+              <rect x="16" y="8" width="4" height="24" rx="1" fill="#c4b5fd"/>
+              <rect x="4" y="14" width="28" height="20" rx="3" fill="#b39dff"/>
+              <rect x="4" y="20" width="28" height="4" rx="1" fill="#c4b5fd"/>
+              <rect x="2" y="10" width="32" height="6" rx="3" fill="#9d72ff"/>
+            </svg>
+            <div>
+              <div class="c-bval" id="cardSubs">306</div>
+              <div class="c-blbl">Total Subscribers</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 icons -->
+        <div class="c-icons">
+          <div class="c-icon pu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12 4l-8 8h5v8h6v-8h5z"/></svg>
+          </div>
+          <div class="c-icon bl">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M2 9h3v12H2V9zm4 12V9l4-7c1 0 2 .5 2 2v4h7c1.1 0 2 .9 2 2l-2 8c-.2.8-.9 1-1.5 1H6z"/></svg>
+          </div>
+          <div class="c-icon gr">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12 3C6.48 3 2 6.92 2 11.5c0 2.4 1.2 4.55 3.1 6.07L4 21l3.9-1.95C9.2 19.65 10.57 20 12 20c5.52 0 10-3.92 10-8.5S17.52 3 12 3z"/></svg>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="c-stats">
+          <div class="c-stat">
+            <div class="c-sval" id="cardEngRate">60%</div>
+            <div class="c-slbl">Engagement<br>Rate</div>
+          </div>
+          <div class="c-stat">
+            <div class="c-sval" id="cardAvgSubs">45%</div>
+            <div class="c-slbl">Average Daily<br>Subscribers</div>
+          </div>
+          <div class="c-stat">
+            <div class="c-sval" id="cardAvgViewers">103</div>
+            <div class="c-slbl">Average<br>Viewers</div>
+          </div>
+        </div>
+
+      </div><!-- /.card -->
+    </div>
+
+    <button class="btn-dl-main" id="btnDlMain">
+      <svg width="18" height="18" fill="none" viewBox="0 0 18 18">
+        <path d="M9 2v10m0 0l-4-4m4 4l4-4M2 15h14" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Download HD Card
+    </button>
+    <p class="dl-hint">Exports at 3× resolution — crisp on any screen</p>
+  </main>
+
+</div><!-- /.body-wrap -->
+
+<script>
+(function () {
+
+  /* ─── ALL DOM REFS (grabbed once, never recreated) ─── */
+  const G = id => document.getElementById(id);
+
+  const el = {
+    /* sidebar inputs */
+    fUsername:   G('fUsername'),
+    fFollowers:  G('fFollowers'),
+    fRank:       G('fRank'),
+    fRankLabel:  G('fRankLabel'),
+    fTier:       G('fTier'),
+    fBits:       G('fBits'),
+    fSubs:       G('fSubs'),
+    fEngRate:    G('fEngRate'),
+    fAvgSubs:    G('fAvgSubs'),
+    fAvgViewers: G('fAvgViewers'),
+    /* sidebar avatar */
+    sidebarAvatar:    G('sidebarAvatar'),
+    sidebarInitial:   G('sidebarInitial'),
+    sidebarAvatarImg: G('sidebarAvatarImg'),
+    btnUpPfp:  G('btnUpPfp'),
+    btnRmPfp:  G('btnRmPfp'),
+    pfpInput:  G('pfpInput'),
+    /* sidebar tier icon */
+    tierThumb:    G('tierThumb'),
+    tierIconSvg:  G('tierIconSvg'),
+    tierThumbImg: G('tierThumbImg'),
+    btnUpTier:  G('btnUpTier'),
+    btnRmTier:  G('btnRmTier'),
+    tierInput:  G('tierInput'),
+    /* verified toggles */
+    btnVerY: G('btnVerY'),
+    btnVerN: G('btnVerN'),
+    /* reset */
+    btnReset: G('btnReset'),
+    /* card text */
+    cardName:      G('cardName'),
+    cardInitial:   G('cardInitial'),
+    cardAvatarImg: G('cardAvatarImg'),
+    cardFollowers: G('cardFollowers'),
+    cardBadge:     G('cardBadge'),
+    cardTierText:  G('cardTierText'),
+    badgeIconSvg:  G('badgeIconSvg'),
+    badgeIconImg:  G('badgeIconImg'),
+    cardRank:      G('cardRank'),
+    cardRankLabel: G('cardRankLabel'),
+    cardVerified:  G('cardVerified'),
+    cardBits:      G('cardBits'),
+    cardSubs:      G('cardSubs'),
+    cardEngRate:   G('cardEngRate'),
+    cardAvgSubs:   G('cardAvgSubs'),
+    cardAvgViewers:G('cardAvgViewers'),
+    /* download */
+    btnDlNav:  G('btnDlNav'),
+    btnDlMain: G('btnDlMain'),
+    theCard:   G('theCard'),
+  };
+
+  /* ─── STATE ─── */
+  const DEFAULTS = {
+    username:'sebbo1693', followers:'4,385k', rank:'65,299',
+    rankLabel:'Ranked in Twitch Top 3%', tier:'Partner',
+    bits:'$567', subs:'306', engRate:'60%',
+    avgSubs:'45%', avgViewers:'103',
+    verified:true, pfp:null, tierIcon:null,
+  };
+  let state = { ...DEFAULTS };
+
+  /* ─── RENDER  (only touches .textContent / .src / .style — never innerHTML) ─── */
+  function render () {
+    const s = state;
+
+    /* username + initials */
+    const initial = (s.username[0] || '?').toUpperCase();
+    el.cardName.textContent    = '@' + s.username;
+    el.cardInitial.textContent = initial;
+    el.sidebarInitial.textContent = initial;
+
+    /* profile picture */
+    if (s.pfp) {
+      el.cardAvatarImg.src     = s.pfp;
+      el.cardAvatarImg.style.display   = 'block';
+      el.cardInitial.style.display     = 'none';
+      el.sidebarAvatarImg.src  = s.pfp;
+      el.sidebarAvatarImg.style.display = 'block';
+      el.sidebarInitial.style.display  = 'none';
+    } else {
+      el.cardAvatarImg.style.display   = 'none';
+      el.cardInitial.style.display     = 'block';
+      el.sidebarAvatarImg.style.display = 'none';
+      el.sidebarInitial.style.display  = 'block';
+    }
+
+    /* followers */
+    el.cardFollowers.textContent = s.followers + ' Followers';
+
+    /* tier badge visibility */
+    el.cardBadge.style.display = s.tier === 'None' ? 'none' : 'inline-flex';
+    el.cardTierText.textContent = s.tier;
+
+    /* tier icon */
+    if (s.tierIcon) {
+      el.badgeIconImg.src            = s.tierIcon;
+      el.badgeIconImg.style.display  = 'block';
+      el.badgeIconSvg.style.display  = 'none';
+      el.tierThumbImg.src            = s.tierIcon;
+      el.tierThumbImg.style.display  = 'block';
+      el.tierIconSvg.style.display   = 'none';
+    } else {
+      el.badgeIconImg.style.display  = 'none';
+      el.badgeIconSvg.style.display  = 'block';
+      el.tierThumbImg.style.display  = 'none';
+      el.tierIconSvg.style.display   = 'block';
+    }
+
+    /* rank */
+    el.cardRank.textContent      = s.rank;
+    el.cardRankLabel.textContent = s.rankLabel;
+
+    /* verified */
+    el.cardVerified.style.display = s.verified ? 'inline-flex' : 'none';
+
+    /* banner */
+    el.cardBits.textContent = s.bits;
+    el.cardSubs.textContent = s.subs;
+
+    /* stats */
+    el.cardEngRate.textContent    = s.engRate;
+    el.cardAvgSubs.textContent    = s.avgSubs;
+    el.cardAvgViewers.textContent = s.avgViewers;
+  }
+
+  /* ─── READ INPUTS → STATE → RENDER ─── */
+  function syncFromInputs () {
+    state.username  = el.fUsername.value;
+    state.followers = el.fFollowers.value;
+    state.rank      = el.fRank.value;
+    state.rankLabel = el.fRankLabel.value;
+    state.tier      = el.fTier.value;
+    state.bits      = el.fBits.value;
+    state.subs      = el.fSubs.value;
+    state.engRate   = el.fEngRate.value;
+    state.avgSubs   = el.fAvgSubs.value;
+    state.avgViewers= el.fAvgViewers.value;
+    render();
+  }
+
+  /* bind every text/select input */
+  [el.fUsername, el.fFollowers, el.fRank, el.fRankLabel,
+   el.fTier, el.fBits, el.fSubs, el.fEngRate, el.fAvgSubs, el.fAvgViewers
+  ].forEach(inp => inp.addEventListener('input', syncFromInputs));
+  el.fTier.addEventListener('change', syncFromInputs);
+
+  /* ─── VERIFIED TOGGLE ─── */
+  el.btnVerY.addEventListener('click', () => {
+    state.verified = true;
+    el.btnVerY.classList.add('on');
+    el.btnVerN.classList.remove('on');
+    render();
+  });
+  el.btnVerN.addEventListener('click', () => {
+    state.verified = false;
+    el.btnVerN.classList.add('on');
+    el.btnVerY.classList.remove('on');
+    render();
+  });
+
+  /* ─── PFP UPLOAD ─── */
+  el.btnUpPfp.addEventListener('click', () => el.pfpInput.click());
+  el.pfpInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      state.pfp = ev.target.result;
+      el.btnRmPfp.style.display = 'flex';
+      render();
+    };
+    reader.readAsDataURL(file);
+  });
+  el.btnRmPfp.addEventListener('click', () => {
+    state.pfp = null;
+    el.pfpInput.value = '';
+    el.btnRmPfp.style.display = 'none';
+    render();
+  });
+
+  /* ─── TIER ICON UPLOAD ─── */
+  el.btnUpTier.addEventListener('click', () => el.tierInput.click());
+  el.tierThumb.addEventListener('click', () => el.tierInput.click());
+  el.tierInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      state.tierIcon = ev.target.result;
+      el.btnRmTier.style.display = 'flex';
+      render();
+    };
+    reader.readAsDataURL(file);
+  });
+  el.btnRmTier.addEventListener('click', () => {
+    state.tierIcon = null;
+    el.tierInput.value = '';
+    el.btnRmTier.style.display = 'none';
+    render();
+  });
+
+  /* ─── RESET ─── */
+  el.btnReset.addEventListener('click', () => {
+    state = { ...DEFAULTS };
+    el.fUsername.value   = DEFAULTS.username;
+    el.fFollowers.value  = DEFAULTS.followers;
+    el.fRank.value       = DEFAULTS.rank;
+    el.fRankLabel.value  = DEFAULTS.rankLabel;
+    el.fTier.value       = DEFAULTS.tier;
+    el.fBits.value       = DEFAULTS.bits;
+    el.fSubs.value       = DEFAULTS.subs;
+    el.fEngRate.value    = DEFAULTS.engRate;
+    el.fAvgSubs.value    = DEFAULTS.avgSubs;
+    el.fAvgViewers.value = DEFAULTS.avgViewers;
+    el.pfpInput.value    = '';
+    el.tierInput.value   = '';
+    el.btnRmPfp.style.display  = 'none';
+    el.btnRmTier.style.display = 'none';
+    el.btnVerY.classList.add('on');
+    el.btnVerN.classList.remove('on');
+    render();
+  });
+
+  /* ─── DOWNLOAD HD ─── */
+  async function download () {
+    if (!window.html2canvas) {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    const canvas = await html2canvas(el.theCard, {
+      scale: 3, useCORS: true, backgroundColor: null, logging: false,
+    });
+    const a = document.createElement('a');
+    a.download = 'twitch-card-' + (state.username || 'card') + '.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  }
+  el.btnDlNav.addEventListener('click', download);
+  el.btnDlMain.addEventListener('click', download);
+
+  /* ─── INIT ─── */
+  render();
+
+})();
+</script>
+</body>
+</html>
