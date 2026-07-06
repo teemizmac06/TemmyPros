@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+<title>TemmyPros — Sign in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   COLOUR TOKENS — LoginPage.jsx scheme
+   ============================================================ */
+:root {
+  --bg-top:   #FBE7ED;
+  --bg-bot:   #F6D6E3;
+  --dark:     #1B1420;
+  --text:     #241923;
+  --accent:   #F0447D;
+  --accent2:  #C22C63;
+  --muted:    #A98D97;
+  --dot-ring: #E9B9C9;
+  --err-col:  #D6335F;
+  --key-sh:   rgba(150,60,95,0.22);
+}
+*{ margin:0; padding:0; box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  min-height:100vh;
+  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bot) 100%);
+  background-attachment: fixed;
+  font-family:'Manrope',sans-serif;
+  display:flex; align-items:center; justify-content:center;
+  overflow-x:hidden;
+  padding: clamp(90px,15vh,120px) clamp(16px,5vw,28px) clamp(28px,5vh,48px);
+}
+
+/* ============================================================
+   DYNAMIC ISLAND
+   — always shows the FULL NAV BAR by default
+   — only collapses to Face-ID size during verification
+   ============================================================ */
+#isl {
+  position: fixed;
+  top: 28px;          /* JS overrides this via visualViewport */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+
+  /* === DEFAULT = full nav bar === */
+  width: min(540px, calc(100vw - 32px));
+  height: 52px;
+  border-radius: 999px;
+  background: #1B1420;
+  border: 1px solid rgba(255,255,255,.09);
+  box-shadow: 0 8px 32px -10px rgba(27,20,32,.45), 0 2px 8px -4px rgba(27,20,32,.3);
+
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden;
+
+  transition:
+    width  .58s cubic-bezier(.2,.8,.2,1),
+    height .58s cubic-bezier(.2,.8,.2,1),
+    border-radius .54s cubic-bezier(.2,.8,.2,1),
+    filter .4s ease,
+    box-shadow .4s ease;
+}
+
+/* Face-ID SCAN */
+#isl.s-scan {
+  width: 168px; height: 168px; border-radius: 44px;
+  filter: drop-shadow(0 0 18px rgba(59,156,255,.65));
+  box-shadow: 0 28px 56px -14px rgba(27,20,32,.7);
+}
+/* Face-ID SUCCESS */
+#isl.s-success {
+  width: 168px; height: 168px; border-radius: 44px;
+  filter: drop-shadow(0 0 22px rgba(48,209,88,.7));
+  box-shadow: 0 28px 56px -14px rgba(27,20,32,.7);
+}
+/* Face-ID ERROR */
+#isl.s-error {
+  width: 168px; height: 168px; border-radius: 44px;
+  filter: drop-shadow(0 0 18px rgba(255,69,58,.6));
+  box-shadow: 0 28px 56px -14px rgba(27,20,32,.7);
+  animation: islShake .5s cubic-bezier(.36,.07,.19,.97);
+}
+@keyframes islShake {
+  10%,90%{ transform: translateX(calc(-50% - 5px)); }
+  20%,80%{ transform: translateX(calc(-50% + 7px)); }
+  30%,50%,70%{ transform: translateX(calc(-50% - 11px)); }
+  40%,60%{ transform: translateX(calc(-50% + 11px)); }
+}
+
+/* ---- Nav bar content ---- */
+#nav-c {
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 18px;
+  opacity:1;
+  transition:opacity .28s;
+  pointer-events:all;
+  white-space:nowrap;
+}
+/* Hide nav content while Face-ID active */
+#isl.s-scan #nav-c,
+#isl.s-success #nav-c,
+#isl.s-error #nav-c { opacity:0; pointer-events:none; }
+
+.nbrand{ display:flex; align-items:center; gap:9px; font-family:'Fredoka',sans-serif; font-weight:600; font-size:17px; color:#fff; }
+.nbmark{
+  width:26px; height:26px; border-radius:8px; flex-shrink:0;
+  background:linear-gradient(135deg, var(--accent), var(--accent2));
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; color:#fff;
+  box-shadow:0 0 12px rgba(240,68,125,.55);
+}
+.nlinks{ display:flex; gap:22px; font-size:13px; }
+.nlinks a{ color:rgba(255,255,255,.55); text-decoration:none; transition:color .2s; }
+.nlinks a:hover{ color:#fff; }
+.ncta{
+  font-size:12.5px; font-weight:700; padding:7px 16px; border-radius:999px;
+  background:var(--accent); color:#fff; text-decoration:none;
+  box-shadow:0 4px 14px -6px rgba(240,68,125,.6);
+  transition:transform .2s, box-shadow .2s;
+}
+.ncta:hover{ transform:scale(1.04); }
+@media(max-width:480px){ .nlinks{ display:none; } }
+
+/* ---- Face-ID glyph area ---- */
+#fid-c {
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; transition:opacity .22s; pointer-events:none;
+}
+#isl.s-scan   #fid-c { opacity:1; transition-delay:.28s; }
+#isl.s-success #fid-c { opacity:1; transition-delay:.28s; }
+#isl.s-error  #fid-c { opacity:1; transition-delay:.2s; }
+
+/* ---- Label pill below island ---- */
+#lbl {
+  position:fixed;
+  top:208px;      /* updated by JS */
+  left:50%;
+  transform:translateX(-50%);
+  background:#1B1420;
+  color:#fff;
+  padding:6px 15px; border-radius:999px;
+  font-size:12.5px; font-weight:700; white-space:nowrap;
+  z-index:9999; opacity:0; pointer-events:none;
+  transition:opacity .25s;
+  box-shadow:0 6px 18px -6px rgba(27,20,32,.5);
+}
+#lbl.on { opacity:1; }
+#lbl.err{ color:#FFB4AC; }
+
+/* ============================================================
+   FACE-ID SVG ANIMATIONS
+   ============================================================ */
+.corner-pulse{ animation:cpulse .5s ease-in-out infinite; }
+@keyframes cpulse{ 0%,100%{opacity:1;} 50%{opacity:.3;} }
+.ring-spin{ animation:rspin 1.4s linear infinite; transform-origin:20px 20px; }
+@keyframes rspin{ to{transform:rotate(360deg);} }
+.fill-pop{ animation:fpop .3s cubic-bezier(.34,1.56,.64,1); transform-origin:20px 19px; }
+@keyframes fpop{ 0%{transform:scale(0);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+.glyph-in{ animation:gin .25s ease; }
+@keyframes gin{ from{opacity:0;transform:scale(.6);} to{opacity:1;transform:scale(1);} }
+.check-draw{
+  stroke-dasharray:22; stroke-dashoffset:22;
+  animation:cdraw .4s .1s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+@keyframes cdraw{ to{stroke-dashoffset:0;} }
+
+/* ============================================================
+   LOGIN PANEL
+   ============================================================ */
+#panel{
+  position:relative; z-index:1;
+  width:100%; max-width:340px;
+  display:flex; flex-direction:column; align-items:center;
+}
+.logo-bubble{
+  width:58px; height:58px; border-radius:18px;
+  background:linear-gradient(135deg,#FCE3EC,#FBBAD0);
+  display:flex; align-items:center; justify-content:center;
+  margin-bottom:14px;
+  box-shadow:0 8px 24px -8px rgba(240,68,125,.35);
+}
+.panel-title{ font-family:'Fredoka',sans-serif; font-size:24px; font-weight:600; color:var(--text); margin-bottom:4px; }
+.panel-sub{ color:var(--muted); font-size:13.5px; text-align:center; margin-bottom:2px; }
+
+.step{ display:none; width:100%; }
+.step.active{ display:flex; flex-direction:column; align-items:center; }
+
+/* username */
+.field{ width:100%; margin-bottom:4px; margin-top:20px; }
+.field label{ display:block; font-size:11.5px; font-weight:700; color:var(--muted); letter-spacing:.4px; margin-bottom:6px; text-transform:uppercase; }
+.field input{
+  width:100%; padding:13px 16px; border-radius:14px;
+  background:rgba(255,255,255,.75); border:1.5px solid rgba(240,68,125,.2);
+  color:var(--text); font-family:'Manrope',sans-serif; font-size:14.5px;
+  outline:none; transition:border-color .2s, box-shadow .2s;
+  box-shadow:0 2px 10px -4px rgba(150,60,95,.15);
+}
+.field input:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 4px rgba(240,68,125,.12);
+}
+.field input::placeholder{ color:var(--dot-ring); }
+
+/* PIN */
+.pin-lbl{ font-size:11.5px; font-weight:700; color:var(--muted); letter-spacing:.5px; text-transform:uppercase; margin-top:22px; }
+.dots{ display:flex; gap:14px; margin:14px 0 4px; }
+.dot{
+  width:14px; height:14px; border-radius:50%;
+  border:2px solid var(--dot-ring); background:transparent;
+  transition:background .15s, border-color .15s, transform .12s;
+}
+.dot.filled{ background:var(--accent); border-color:var(--accent); animation:dotPop .2s ease; }
+@keyframes dotPop{ 0%{transform:scale(.4);} 65%{transform:scale(1.35);} 100%{transform:scale(1);} }
+
+.perr{ min-height:20px; text-align:center; margin-bottom:6px; }
+.perr span{ color:var(--err-col); font-size:12.5px; font-weight:600; }
+.shake{ animation:shakeX .42s ease; }
+@keyframes shakeX{
+  10%,90%{transform:translateX(-2px);}
+  20%,80%{transform:translateX(4px);}
+  30%,50%,70%{transform:translateX(-8px);}
+  40%,60%{transform:translateX(8px);}
+}
+
+/* Keypad */
+.keypad{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; width:100%; margin-top:4px; }
+.kbtn{
+  height:clamp(54px,14vw,66px); border-radius:18px; border:none;
+  background:#fff;
+  box-shadow:0 4px 14px -6px var(--key-sh);
+  font-family:'Fredoka',sans-serif; font-size:clamp(20px,5.5vw,26px); font-weight:600;
+  color:var(--text); cursor:pointer;
+  transition:transform .12s, box-shadow .12s;
+  display:flex; align-items:center; justify-content:center;
+  touch-action:manipulation;
+}
+.kbtn:hover{ box-shadow:0 6px 18px -6px var(--key-sh); transform:translateY(-1px); }
+.kbtn:active{ transform:scale(.93); }
+.kbtn:disabled{ opacity:.4; cursor:not-allowed; }
+.kbtn.ghost{ background:transparent; box-shadow:none; }
+.kbtn.ghost:hover{ background:rgba(240,68,125,.07); transform:none; }
+
+/* OTP step */
+.otp-row{
+  display:flex; gap:clamp(6px,2.5vw,12px);
+  margin:20px 0 4px; width:100%;
+}
+.otp-row input{
+  flex:1; min-width:0; text-align:center;
+  font-family:'JetBrains Mono',monospace;
+  font-size:clamp(18px,5.5vw,24px); font-weight:600;
+  color:var(--text);
+  padding:clamp(11px,3.5vw,16px) 0;
+  border-radius:clamp(10px,3vw,16px);
+  background:rgba(255,255,255,.8);
+  border:1.5px solid rgba(240,68,125,.2);
+  outline:none; transition:border-color .2s, box-shadow .2s;
+  box-shadow:0 2px 10px -4px rgba(150,60,95,.1);
+  touch-action:manipulation;
+}
+.otp-row input:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 4px rgba(240,68,125,.12);
+}
+.otp-note{ font-size:clamp(10px,2.8vw,12px); color:var(--muted); margin-top:8px; text-align:center; line-height:1.5; }
+
+.back-btn{
+  display:inline-flex; align-items:center; gap:6px;
+  color:var(--muted); font-size:12.5px; font-weight:600;
+  cursor:pointer; margin-top:18px; background:none; border:none;
+  font-family:'Manrope',sans-serif; transition:color .2s;
+}
+.back-btn:hover{ color:var(--accent2); }
+
+@media(prefers-reduced-motion:reduce){
+  *{ animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ==================== DYNAMIC ISLAND ==================== -->
+<div id="isl">
+  <div id="nav-c">
+    <div class="nbrand"><span class="nbmark">TP</span>TemmyPros</div>
+    <div class="nlinks">
+      <a href="dashboard.html">Tools</a>
+      <a href="#">Docs</a>
+      <a href="#">About</a>
+    </div>
+    <a href="#" class="ncta">Sign in</a>
+  </div>
+  <div id="fid-c"></div>
+</div>
+<div id="lbl"></div>
+
+<!-- ==================== LOGIN PANEL ==================== -->
+<div id="panel">
+
+  <!-- Step 1: username + 6-digit PIN -->
+  <div class="step active" id="s1">
+    <div class="logo-bubble">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2c1.5 0 2.5 1.2 2.2 2.6C15.8 5 17 6.3 17 8H7c0-1.7 1.2-3 2.8-3.4C9.5 3.2 10.5 2 12 2z" fill="#F0447D"/>
+        <path d="M5 9h14l-1.4 9.3A3 3 0 0 1 14.6 21H9.4a3 3 0 0 1-3-2.7L5 9z" fill="#FCE3EC" stroke="#F0447D" stroke-width="1.2"/>
+      </svg>
+    </div>
+    <p class="panel-title">Welcome back</p>
+    <p class="panel-sub">Sign in to TemmyPros</p>
+
+    <div class="field">
+      <label for="un">Username or email</label>
+      <input id="un" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Enter username or email">
+    </div>
+
+    <p class="pin-lbl">6-Digit PIN</p>
+    <div class="dots" id="dots">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>
+    <div class="perr" id="perr"></div>
+    <div class="keypad" id="kp"></div>
+  </div>
+
+  <!-- Step 2: 4-digit OTP (auto-submits on 4th digit) -->
+  <div class="step" id="s2">
+    <div class="logo-bubble">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+        <rect x="5" y="11" width="14" height="10" rx="2" fill="#FCE3EC" stroke="#F0447D" stroke-width="1.3"/>
+        <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="#F0447D" stroke-width="1.4" stroke-linecap="round"/>
+        <circle cx="12" cy="16" r="1.5" fill="#F0447D"/>
+      </svg>
+    </div>
+    <p class="panel-title">One last step</p>
+    <p class="panel-sub">Enter the 4‑digit verification code</p>
+
+    <div class="otp-row">
+      <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" class="od">
+      <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" class="od">
+      <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" class="od">
+      <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" class="od">
+    </div>
+    <p class="otp-note">Submits automatically when complete · expires in 5 min</p>
+    <div class="perr" id="operr"></div>
+    <button class="back-btn" id="bkbtn" type="button">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      Back
+    </button>
+  </div>
+
+</div>
+
+<script>
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const VALID_USERS = ['moneymustbemade', 'moneymustbemade@temail.com'];
+const VALID_PIN   = '102030';   // ← change to your 6-digit PIN
+const VALID_OTP   = '1020';
+const REDIRECT    = 'dashboard.html';
+
+/* ============================================================
+   KEEP ISLAND PINNED — does not move when keyboard opens
+   Uses the VisualViewport API to compensate for iOS/Android
+   keyboard pushing the layout viewport.
+   ============================================================ */
+const isl  = document.getElementById('isl');
+const lbl  = document.getElementById('lbl');
+
+function pinIsland() {
+  if (!window.visualViewport) return;
+  const vv = window.visualViewport;
+  // Keep island 28px from top of the VISIBLE viewport
+  const topOffset = vv.offsetTop + 28;
+  isl.style.top  = topOffset + 'px';
+  isl.style.left = (vv.offsetLeft + vv.width / 2) + 'px';
+  // Label sits below Face-ID expanded height (168px) + 12px gap
+  lbl.style.top  = (topOffset + 168 + 12) + 'px';
+  lbl.style.left = (vv.offsetLeft + vv.width / 2) + 'px';
+}
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', pinIsland);
+  window.visualViewport.addEventListener('scroll', pinIsland);
+}
+// Also fire when any input gains/loses focus (keyboard open/close)
+document.addEventListener('focusin',  () => setTimeout(pinIsland, 80));
+document.addEventListener('focusout', () => setTimeout(pinIsland, 200));
+
+/* ============================================================
+   DYNAMIC ISLAND STATE MACHINE
+   Default (no class) = full nav bar
+   s-scan / s-success / s-error = Face-ID states
+   ============================================================ */
+const fidC = document.getElementById('fid-c');
+let   islBusy = false;
+
+function fidSVG(state) {
+  const a  = state==='success'?'#30D158':state==='error'?'#FF453A':'#3B9CFF';
+  const cp = state==='scan'?'class="corner-pulse"':'';
+  const corners = `
+    <path ${cp} d="M3 12V7a4 4 0 0 1 4-4h5"   stroke="${a}" stroke-width="2.4" stroke-linecap="round"/>
+    <path ${cp} d="M37 12V7a4 4 0 0 0-4-4h-5"  stroke="${a}" stroke-width="2.4" stroke-linecap="round"/>
+    <path ${cp} d="M3 28v5a4 4 0 0 0 4 4h5"   stroke="${a}" stroke-width="2.4" stroke-linecap="round"/>
+    <path ${cp} d="M37 28v5a4 4 0 0 1-4 4h-5"  stroke="${a}" stroke-width="2.4" stroke-linecap="round"/>`;
+  let inner = '';
+  if (state==='scan') inner = `
+    <circle cx="14.5" cy="17" r="1.6" fill="${a}"/>
+    <circle cx="25.5" cy="17" r="1.6" fill="${a}"/>
+    <path d="M20 15v6.5c0 .8-.7 1.3-1.4 1.1" stroke="${a}" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M14.5 26c2 1.6 9 1.6 11 0" stroke="${a}" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="20" cy="20" r="17" stroke="${a}" stroke-width="1.3" stroke-dasharray="3 5" class="ring-spin" fill="none" opacity=".7"/>`;
+  if (state==='success') inner = `
+    <circle cx="20" cy="19" r="13" fill="${a}" class="fill-pop"/>
+    <path d="M13.5 19.5l4 4L27 13.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" class="check-draw"/>`;
+  if (state==='error') inner = `
+    <circle cx="20" cy="19" r="13" fill="${a}" class="fill-pop"/>
+    <path d="M15.5 14.5l9 9M24.5 14.5l-9 9" stroke="#fff" stroke-width="2.6" stroke-linecap="round" class="check-draw"/>`;
+  return `<svg width="92" height="92" viewBox="0 0 40 40" fill="none" class="glyph-in">${corners}${inner}</svg>`;
+}
+
+function setLbl(txt, isErr) {
+  if (!txt) { lbl.className = ''; return; }
+  lbl.textContent = txt;
+  lbl.className   = 'on' + (isErr ? ' err' : '');
+}
+
+// Transition island: pass null to return to nav bar
+function toState(state) {
+  if (state) {
+    isl.className  = 's-' + state;
+    fidC.innerHTML = fidSVG(state);
+    // Clear any inline opacity so the CSS class + transition-delay
+    // can control the fade-in (inline styles override class styles)
+    fidC.style.opacity = '';
+  } else {
+    isl.className  = '';        // ← back to default = full nav bar
+    fidC.style.opacity = '0';   // hide glyph immediately before clearing
+    setTimeout(() => { fidC.innerHTML = ''; fidC.style.opacity = ''; }, 280);
+  }
+}
+
+// Full Face-ID sequence
+function faceID(result, done) {
+  if (islBusy) return;
+  islBusy = true;
+
+  if (result === 'success') {
+    toState('scan');
+    setLbl('Verifying password…');
+
+    setTimeout(() => {
+      toState('success');
+      setLbl('Verified');
+    }, 1400);
+
+    setTimeout(() => {
+      setLbl('');
+      toState(null);           // expand back to full nav bar
+      setTimeout(() => { islBusy = false; done && done(); }, 650);
+    }, 2350);
+
+  } else {
+    toState('error');
+    setLbl('Try Again', true);
+    setTimeout(() => {
+      setLbl('');
+      toState(null);           // expand back to full nav bar
+      islBusy = false;
+    }, 960);
+  }
+}
+
+/* ============================================================
+   STEP NAVIGATION
+   ============================================================ */
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ============================================================
+   6-DIGIT PIN KEYPAD
+   ============================================================ */
+let curPin  = '';
+let pinBusy = false;
+const dotsEl = document.querySelectorAll('.dot');
+const perrEl = document.getElementById('perr');
+
+function refreshDots() {
+  dotsEl.forEach((d, i) => {
+    i < curPin.length ? d.classList.add('filled') : d.classList.remove('filled');
+  });
+}
+
+function addDigit(d) {
+  if (curPin.length >= 6 || pinBusy || islBusy) return;
+  perrEl.innerHTML = '';
+  curPin += d;
+  refreshDots();
+  if (curPin.length === 6) { pinBusy = true; checkPin(); }
+}
+
+function delDigit() {
+  if (pinBusy || islBusy) return;
+  curPin = curPin.slice(0, -1);
+  refreshDots();
+}
+
+function checkPin() {
+  const u = document.getElementById('un').value.trim().toLowerCase();
+  if (!u) {
+    perrEl.innerHTML = '<span>Please enter your username first.</span>';
+    curPin = ''; refreshDots(); pinBusy = false; return;
+  }
+  if (VALID_USERS.includes(u) && curPin === VALID_PIN) {
+    perrEl.innerHTML = '';
+    curPin = ''; refreshDots(); pinBusy = false;
+    showStep('s2');
+    setTimeout(() => document.querySelector('.od').focus(), 80);
+  } else {
+    perrEl.innerHTML = '<span>Incorrect username or PIN.</span>';
+    document.getElementById('dots').classList.add('shake');
+    setTimeout(() => document.getElementById('dots').classList.remove('shake'), 500);
+    faceID('error');
+    setTimeout(() => { curPin = ''; refreshDots(); pinBusy = false; }, 700);
+  }
+}
+
+// Build keypad
+const KP = document.getElementById('kp');
+['1','2','3','4','5','6','7','8','9','','0','back'].forEach(k => {
+  if (k === '') { KP.appendChild(document.createElement('div')); return; }
+  const b = document.createElement('button');
+  b.type = 'button';
+  if (k === 'back') {
+    b.className = 'kbtn ghost';
+    b.setAttribute('aria-label','Delete');
+    b.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A98D97" stroke-width="1.8"><path d="M9 6h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-6-6 6-6z"/><path d="M14 10l4 4M18 10l-4 4"/></svg>`;
+    b.addEventListener('click', delDigit);
+  } else {
+    b.className = 'kbtn';
+    b.textContent = k;
+    b.addEventListener('click', () => addDigit(k));
+  }
+  KP.appendChild(b);
+});
+
+// Physical keyboard support (when step 1 active & focus NOT on username field)
+window.addEventListener('keydown', e => {
+  if (!document.getElementById('s1').classList.contains('active')) return;
+  if (document.activeElement?.id === 'un') return;
+  if (e.key >= '0' && e.key <= '9') addDigit(e.key);
+  if (e.key === 'Backspace') delDigit();
+});
+
+/* ============================================================
+   4-DIGIT OTP — AUTO-SUBMITS ON 4TH DIGIT
+   ============================================================ */
+const ods = document.querySelectorAll('.od');
+let otpLocked = false;
+
+ods.forEach((d, i) => {
+  d.addEventListener('input', () => {
+    d.value = d.value.replace(/[^0-9]/g, '');
+    if (d.value && ods[i + 1]) ods[i + 1].focus();
+    const code = Array.from(ods).map(x => x.value).join('');
+    if (code.length === 4 && !otpLocked) { otpLocked = true; checkOTP(code); }
+  });
+  d.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && !d.value && ods[i - 1]) ods[i - 1].focus();
+  });
+});
+
+function checkOTP(code) {
+  const opErr = document.getElementById('operr');
+  if (code === VALID_OTP) {
+    opErr.innerHTML = '';
+    document.getElementById('panel').style.opacity      = '0.2';
+    document.getElementById('panel').style.pointerEvents = 'none';
+    faceID('success', () => {
+      sessionStorage.setItem('tp_auth', '1');
+      setTimeout(() => { window.location.href = REDIRECT; }, 450);
+    });
+  } else {
+    opErr.innerHTML = '<span style="color:#D6335F;font-size:12.5px;font-weight:600">Incorrect code. Try again.</span>';
+    ods.forEach(d => d.value = '');
+    otpLocked = false;
+    ods[0].focus();
+    faceID('error');
+  }
+}
+
+document.getElementById('bkbtn').addEventListener('click', () => {
+  document.getElementById('operr').innerHTML = '';
+  ods.forEach(d => d.value = '');
+  otpLocked = false;
+  curPin = ''; refreshDots();
+  showStep('s1');
+});
+</script>
+</body>
+</html>
